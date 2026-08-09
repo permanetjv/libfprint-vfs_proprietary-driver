@@ -273,6 +273,17 @@ commands
   continue
 end
 
+break *scsFalconDeviceInit+0xf13
+commands
+  silent
+  printf "  Falcon secure-session establish result: 0x%x (%d)\n", $eax, $eax
+  set $ssl_context = *(void **)($rbx + 0x1d8)
+  if $ssl_context != 0
+    printf "    SSL state=%u stored_result=0x%x (%d)\n", *(unsigned char *)($ssl_context + 0x4e4), *(unsigned int *)($ssl_context + 0x4e8), *(unsigned int *)($ssl_context + 0x4e8)
+  end
+  continue
+end
+
 break *scsFalconDeviceInit+0xf3d
 commands
   silent
