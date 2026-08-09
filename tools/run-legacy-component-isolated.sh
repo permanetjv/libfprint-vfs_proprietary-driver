@@ -236,6 +236,23 @@ if [[ -n ${VFS495_GDB_PATH:-} ]]; then
             echo "refusing provisioning with an unaudited initializer binary" >&2
             exit 2
         fi
+        if [[ $VFS495_USB_SCOPE != mirror ]]; then
+            echo "provisioning requires the re-enumeration-safe USB mirror" >&2
+            exit 2
+        fi
+        : "${VFS495_PROVISION_MIRROR_MONITOR_PID:?set the live USB mirror monitor PID}"
+        if [[ ! $VFS495_PROVISION_MIRROR_MONITOR_PID =~ ^[1-9][0-9]*$ ]] ||
+           ! kill -0 "$VFS495_PROVISION_MIRROR_MONITOR_PID" 2>/dev/null; then
+            echo "refusing provisioning without a live USB mirror monitor" >&2
+            exit 2
+        fi
+        mirrored_usb_device=$VFS495_USB_MIRROR${VFS495_USB_DEVICE#/dev/bus/usb}
+        if [[ ! -c $mirrored_usb_device ]] ||
+           [[ $(stat -c %t:%T "$mirrored_usb_device") != \
+              $(stat -c %t:%T "$VFS495_USB_DEVICE") ]]; then
+            echo "refusing provisioning with a stale USB mirror device" >&2
+            exit 2
+        fi
         gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-provision-vfs495.commands
     elif [[ $trace_setowner == 1 ]]; then
         gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-setowner-result.commands
