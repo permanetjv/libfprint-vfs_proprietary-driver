@@ -216,6 +216,34 @@ commands
   continue
 end
 
+break VerifyRAWPartitionIntegrity
+commands
+  silent
+  printf "  Falcon RAW-partition integrity check started: sensor=%p\n", $rdi
+  continue
+end
+
+break *VerifyRAWPartitionIntegrity+0x4a
+commands
+  silent
+  printf "    CalculateRAWPartitionHash result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *VerifyRAWPartitionIntegrity+0x95
+commands
+  silent
+  printf "    xvfsGetRawPartitionEntry result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *scsFalconDeviceInit+0x782
+commands
+  silent
+  printf "  Falcon RAW-partition integrity result: 0x%x (%d), mismatch=%u\n", $eax, $eax, *(unsigned int *)($rsp + 0x368)
+  continue
+end
+
 break *scsFalconDeviceInit+0x252
 commands
   silent
