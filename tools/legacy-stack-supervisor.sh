@@ -28,6 +28,7 @@ cleanup() {
     if [[ -n $service_launcher_pid ]]; then
         wait "$service_launcher_pid" 2>/dev/null || true
     fi
+    /usr/bin/rm -f /tmp/vcsSemKey_* /tmp/CH_*
 }
 trap cleanup EXIT HUP INT TERM
 
@@ -43,6 +44,11 @@ if [[ -n ${VFS495_STRACE_PATH:-} ]]; then
     service_cmd=(/opt/bin/strace "${trace_args[@]}" -o /tmp/vcsFPService.strace "${service_cmd[@]}")
     helper_cmd=(/opt/bin/strace "${trace_args[@]}" -o /tmp/capture-helper.strace "${helper_cmd[@]}")
 fi
+
+# The daemon's ready marker and channel files outlive a killed process because
+# this isolated /tmp is persistent across diagnostic runs.  Never let a stale
+# marker satisfy the readiness check for a newly starting daemon.
+/usr/bin/rm -f /tmp/vcsSemKey_* /tmp/CH_*
 
 "${service_cmd[@]}" &
 service_launcher_pid=$!
