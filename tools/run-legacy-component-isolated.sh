@@ -353,14 +353,16 @@ if [[ -n ${VFS495_GDB_PATH:-} ]]; then
     provision_vfs495=${VFS495_GDB_PROVISION_VFS495:-}
     setowner_cache_compat=${VFS495_GDB_SETOWNER_CACHE_COMPAT:-}
     setowner_aes_keys=${VFS495_GDB_SETOWNER_AES_KEYS:-}
+    setowner_full_keys=${VFS495_GDB_SETOWNER_FULL_KEYS:-}
     selected_gdb_modes=0
     [[ -n $readonly_command ]] && ((selected_gdb_modes += 1))
     [[ $trace_setowner == 1 ]] && ((selected_gdb_modes += 1))
     [[ -n $provision_vfs495 ]] && ((selected_gdb_modes += 1))
     [[ -n $setowner_cache_compat ]] && ((selected_gdb_modes += 1))
     [[ -n $setowner_aes_keys ]] && ((selected_gdb_modes += 1))
+    [[ -n $setowner_full_keys ]] && ((selected_gdb_modes += 1))
     if ((selected_gdb_modes > 1)); then
-        echo "choose only one read-only, setowner-trace, cache-compat, AES-key ownership, or provisioning GDB mode" >&2
+        echo "choose only one read-only, setowner-trace, cache-compat, AES-key ownership, full-key ownership, or provisioning GDB mode" >&2
         exit 2
     fi
     if [[ -n $trace_setowner && $trace_setowner != 1 ]]; then
@@ -407,6 +409,78 @@ if [[ -n ${VFS495_GDB_PATH:-} ]]; then
             exit 2
         fi
         gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-provision-vfs495.commands
+    elif [[ -n $setowner_full_keys ]]; then
+        require_ac_power
+        expected_ack=I_ACCEPT_VFS495_FULL_TEST_KEY_OWNERSHIP
+        if [[ $setowner_full_keys != "$expected_ack" ]]; then
+            echo "refusing full-key ownership without the exact acknowledgement token" >&2
+            exit 2
+        fi
+        if [[ $# -ne 2 || $1 != setowner || $2 != -doinit ]]; then
+            echo "full-key ownership requires exactly: initializer setowner -doinit" >&2
+            exit 2
+        fi
+        : "${VFS495_SETOWNER_EXPECTED_INITIALIZER_SHA256:?set the audited initializer SHA-256}"
+        if [[ ! $VFS495_SETOWNER_EXPECTED_INITIALIZER_SHA256 =~ ^[0-9a-f]{64}$ ]]; then
+            echo "VFS495_SETOWNER_EXPECTED_INITIALIZER_SHA256 must be 64 lowercase hex characters" >&2
+            exit 2
+        fi
+        actual_initializer_sha256=$(sha256sum \
+            "$VFS495_VENDOR_ROOT/usr/sbin/validity-sensor" | awk '{print $1}')
+        if [[ $actual_initializer_sha256 != "$VFS495_SETOWNER_EXPECTED_INITIALIZER_SHA256" ]]; then
+            echo "refusing full-key ownership with an unaudited initializer binary" >&2
+            exit 2
+        fi
+        if [[ $VFS495_USB_SCOPE != mirror ]]; then
+            echo "full-key ownership requires the re-enumeration-safe USB mirror" >&2
+            exit 2
+        fi
+        : "${VFS495_SETOWNER_MIRROR_MONITOR_PID:?set the live USB mirror monitor PID}"
+        if [[ ! $VFS495_SETOWNER_MIRROR_MONITOR_PID =~ ^[1-9][0-9]*$ ]] ||
+           ! kill -0 "$VFS495_SETOWNER_MIRROR_MONITOR_PID" 2>/dev/null; then
+            echo "refusing full-key ownership without a live USB mirror monitor" >&2
+            exit 2
+        fi
+        mirrored_usb_device=$VFS495_USB_MIRROR${VFS495_USB_DEVICE#/dev/bus/usb}
+        if [[ ! -c $mirrored_usb_device ]] ||
+           [[ $(stat -c %t:%T "$mirrored_usb_device") != \
+              $(stat -c %t:%T "$VFS495_USB_DEVICE") ]]; then
+            echo "refusing full-key ownership with a stale USB mirror device" >&2
+            exit 2
+        fi
+        : "${VFS495_SETOWNER_KEYS_ROOT:?set the private ownership-key directory}"
+        if [[ ! -d $VFS495_SETOWNER_KEYS_ROOT || -L $VFS495_SETOWNER_KEYS_ROOT ]]; then
+            echo "ownership-key root must be a non-symlink directory" >&2
+            exit 2
+        fi
+        declare -A expected_key_sizes=(
+            [ha_pub_mod.bin]=256
+            [ha_priv_blob.bin]=1184
+            [s_priv_exp.bin]=256
+            [s_priv_mod.bin]=256
+            [cik.bin]=32
+            [cios.bin]=32
+        )
+        for key_name in "${!expected_key_sizes[@]}"; do
+            key_path=$VFS495_SETOWNER_KEYS_ROOT/$key_name
+            if [[ ! -f $key_path || -L $key_path ]] ||
+               [[ $(stat -c %s "$key_path") != "${expected_key_sizes[$key_name]}" ]]; then
+                echo "$key_path must be a regular, non-symlink ${expected_key_sizes[$key_name]}-byte file" >&2
+                exit 2
+            fi
+            if ((8#$(stat -c %a "$key_path") & 077)); then
+                echo "$key_path must not grant group or other permissions" >&2
+                exit 2
+            fi
+        done
+        bwrap_args+=(
+            --ro-bind "$VFS495_SETOWNER_KEYS_ROOT" /opt/ownership-keys
+            --chdir /opt/ownership-keys
+        )
+        # Supply one inert raw argv slot. The debugger validates the processed
+        # argc before repointing argv[1..4] at audited in-binary option strings.
+        set -- "$@" __vfs495_full_key_pointer_slot
+        gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-setowner-full-keys.commands
     elif [[ -n $setowner_aes_keys ]]; then
         require_ac_power
         expected_ack=I_ACCEPT_VFS495_AES_OWNERSHIP_WITH_NEW_KEYS
