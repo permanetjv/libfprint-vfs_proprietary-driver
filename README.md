@@ -5,6 +5,9 @@
 
 [**See project status announcement**](https://github.com/rindeal/libfprint-vfs_proprietary-driver/issues/8)
 
+The Fedora Silverblue 44 and libfprint 1.94.10 port is documented in
+[docs/fedora-silverblue-44.md](docs/fedora-silverblue-44.md).
+
 ## What
 
 [libfprint](https://www.freedesktop.org/wiki/Software/fprint/libfprint/) driver for:

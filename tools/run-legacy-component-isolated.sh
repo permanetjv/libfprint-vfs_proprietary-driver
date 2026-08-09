@@ -88,17 +88,27 @@ install -d -m 0700 \
     "$VFS495_STATE_ROOT/persistent"
 
 network_bwrap_args=(--unshare-net)
+udev_bwrap_args=()
 if [[ ${VFS495_USE_HOST_NETLINK:-} == 1 ]]; then
     [[ $component == initializer ]] || {
         echo "VFS495_USE_HOST_NETLINK is supported only for the initializer" >&2
         exit 2
     }
+    [[ -d /run/udev ]] || {
+        echo "/run/udev is required for initializer device rediscovery" >&2
+        exit 2
+    }
     network_bwrap_args=()
+    udev_bwrap_args=(
+        --dir /run/udev
+        --ro-bind /run/udev /run/udev
+    )
 fi
 
 bwrap_args=(
     "${network_bwrap_args[@]}"
     --unshare-pid
+    --unshare-ipc
     --new-session
     --die-with-parent
     --cap-drop ALL
@@ -108,6 +118,7 @@ bwrap_args=(
     "${usb_bwrap_args[@]}"
     --bind "$VFS495_STATE_ROOT/tmp" /tmp
     --bind "$VFS495_STATE_ROOT/run" /run
+    "${udev_bwrap_args[@]}"
     --tmpfs /etc
     --dir /etc/ValidityPersistentData
     --bind "$VFS495_STATE_ROOT/persistent" /etc/ValidityPersistentData
@@ -180,16 +191,39 @@ if [[ -n ${VFS495_GDB_PATH:-} ]]; then
     fi
     debugged_executable=$executable
     executable=/opt/bin/gdb
-    if [[ ${VFS495_GDB_READONLY_COMMAND:-} == sensorstat ]]; then
+    if [[ -n ${VFS495_GDB_READONLY_COMMAND:-} &&
+          -n ${VFS495_GDB_TRACE_SETOWNER_RESULT:-} ]]; then
+        echo "choose either a read-only GDB command or the setowner result trace" >&2
+        exit 2
+    fi
+    if [[ ${VFS495_GDB_TRACE_SETOWNER_RESULT:-} == 1 ]]; then
+        gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-setowner-result.commands
+    else
+      case ${VFS495_GDB_READONLY_COMMAND:-} in
+      sensorstat)
         gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-sensorstat.commands
+        ;;
+      get_ownership_info)
+        gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-get-ownership-info.commands
+        ;;
+      '')
+        gdb_commands=
+        ;;
+      *)
+        echo "unsupported read-only GDB command: $VFS495_GDB_READONLY_COMMAND" >&2
+        exit 2
+        ;;
+      esac
+    fi
+    if [[ -n $gdb_commands ]]; then
         [[ -f $gdb_commands ]] || {
-            echo "missing GDB sensorstat command file" >&2
+            echo "missing GDB read-only command file: $gdb_commands" >&2
             exit 2
         }
-        bwrap_args+=(--ro-bind "$gdb_commands" /opt/bin/gdb-sensorstat.commands)
+        bwrap_args+=(--ro-bind "$gdb_commands" /opt/bin/gdb-readonly.commands)
         set -- \
             --batch \
-            -x /opt/bin/gdb-sensorstat.commands \
+            -x /opt/bin/gdb-readonly.commands \
             --args "$debugged_executable" "$@"
     else
         set -- \
