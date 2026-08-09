@@ -39,6 +39,9 @@ under `/var/lib/vfs495-runtime`, copy `runtime.conf.example` to
 `/etc/vfs495/runtime.conf`, and verify its pinned hashes. The fprintd drop-in
 passes legacy library paths only to capture-helper children and joins the
 vendor service's systemd-created private `/tmp` and IPC namespaces.
+The vendor service conflicts with `sleep.target`; its `BindsTo` relationship
+stops fprintd before suspend. A later D-Bus request starts a fresh vendor
+service and fprintd instance after resume.
 
 After raw capture and the production isolation configuration are verified:
 

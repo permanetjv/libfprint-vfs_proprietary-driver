@@ -3,6 +3,8 @@ Description=Isolated persistent VFS495 vendor capture service
 Requires=vfs495-usb-mirror.service
 After=vfs495-usb-mirror.service
 Before=fprintd.service
+Before=sleep.target
+Conflicts=sleep.target
 ConditionPathExists=/etc/vfs495/runtime.conf
 
 [Service]

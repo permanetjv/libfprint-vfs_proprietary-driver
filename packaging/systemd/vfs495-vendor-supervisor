@@ -20,9 +20,21 @@ for root in "$vendor_root" "$openssl_root" "$libusb_root"; do
         exit 2
     }
 done
-[[ $mirror_root == /dev/vfs495-usb && -d $mirror_root ]] || {
-    echo "the validated VFS495 USB mirror is unavailable" >&2
+[[ $mirror_root == /dev/vfs495-usb ]] || {
+    echo "refusing unexpected VFS495 USB mirror path" >&2
     exit 2
+}
+
+mirrored_device=
+for ((attempt = 0; attempt < ready_timeout * 10; attempt++)); do
+    mirrored_device=$(find "$mirror_root" -mindepth 2 -maxdepth 2 \
+        -type c -print -quit 2>/dev/null || true)
+    [[ -n $mirrored_device ]] && break
+    sleep 0.1
+done
+[[ -n $mirrored_device ]] || {
+    echo "the validated VFS495 USB mirror has no device" >&2
+    exit 1
 }
 
 service=$vendor_root/usr/bin/vcsFPService
