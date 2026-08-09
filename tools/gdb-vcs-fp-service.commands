@@ -2,12 +2,21 @@ set pagination off
 set startup-with-shell off
 set debuginfod enabled off
 set confirm off
-set follow-fork-mode child
+set follow-fork-mode parent
 set detach-on-fork on
 
 # vcsFPService is stripped, but its service entry points remain in the dynamic
 # symbol table.  Stop at the ELF entry point before installing breakpoints.
 starti
+
+# The service runs shell cleanup through vfork before it daemonizes with fork.
+# Stay with the parent for the former, then follow the actual daemon child.
+catch fork
+commands
+  silent
+  set follow-fork-mode child
+  continue
+end
 
 break serviceVcsSensorGetFingerprintAsync
 commands
