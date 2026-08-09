@@ -7,6 +7,43 @@ set confirm off
 # available once execution reaches the helper's main function.
 start
 
+break vcsSensorGetFingerprintAsyncPriv
+commands
+  silent
+  printf "vcsSensorGetFingerprintAsyncPriv args: sensor=%p config=%p group=%p label=%p\n", $rdi, $rsi, $rdx, $rcx
+  if $rdi != 0
+    printf "  sensor words:"
+    x/4gx $rdi
+  end
+  if $rsi != 0
+    printf "  config words:"
+    x/4gx $rsi
+  end
+  if $rdx != 0
+    printf "  group state: sensor=%p async_handle=%p app=%p\n", *(void **)($rdx + 0x90), *(void **)($rdx + 0xa8), *(void **)($rdx + 0x138)
+  end
+  if $rcx != 0
+    printf "  label: %s\n", (char *)$rcx
+  end
+  continue
+end
+
+# The transfer call returns a transport status in eax and places the daemon's
+# operation status in the final four-byte response buffer.
+break *vcsSensorGetFingerprintAsyncPriv+0x8f
+commands
+  silent
+  printf "vcsFPClientTransferCall result: 0x%x (%d), daemon result: 0x%x (%d)\n", $eax, $eax, *(unsigned int *)($rsp + 0x130), *(unsigned int *)($rsp + 0x130)
+  continue
+end
+
+break *GroupGetFingerprintAsync+0xe7
+commands
+  silent
+  printf "vcsSensorGetFingerprintAsyncA result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
 break *GroupGetFingerprint+0x85
 commands
   silent
