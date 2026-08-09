@@ -40,6 +40,9 @@ trace_args=(
 )
 service_cmd=(/opt/vendor/usr/bin/vcsFPService)
 helper_cmd=(/opt/bin/capture-helper)
+if [[ -n ${VFS495_SERVICE_GDB_PATH:-} ]]; then
+    service_cmd=(/opt/bin/vcsFPService-gdb)
+fi
 if [[ -n ${VFS495_STRACE_PATH:-} ]]; then
     service_cmd=(/opt/bin/strace "${trace_args[@]}" -o /tmp/vcsFPService.strace "${service_cmd[@]}")
     helper_cmd=(/opt/bin/strace "${trace_args[@]}" -o /tmp/capture-helper.strace "${helper_cmd[@]}")

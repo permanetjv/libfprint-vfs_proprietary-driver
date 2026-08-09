@@ -1,0 +1,61 @@
+set pagination off
+set startup-with-shell off
+set debuginfod enabled off
+set confirm off
+set follow-fork-mode child
+set detach-on-fork on
+
+# vcsFPService is stripped, but its service entry points remain in the dynamic
+# symbol table.  Stop at the ELF entry point before installing breakpoints.
+starti
+
+break serviceVcsSensorGetFingerprintAsync
+commands
+  silent
+  printf "serviceVcsSensorGetFingerprintAsync request\n"
+  continue
+end
+
+break *serviceVcsSensorGetFingerprintAsync+0x63
+commands
+  silent
+  printf "  vcsFPAddToCallbackList result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *serviceVcsSensorGetFingerprintAsync+0xfe
+commands
+  silent
+  printf "  sensor lookup result: %p\n", $rax
+  continue
+end
+
+break *serviceVcsSensorGetFingerprintAsync+0x119
+commands
+  silent
+  printf "  sensor state query result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *serviceVcsSensorGetFingerprintAsync+0x13a
+commands
+  silent
+  printf "  vcsSensorUpdateGetPrintContext result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *serviceVcsSensorGetFingerprintAsync+0x217
+commands
+  silent
+  printf "  prepare-get-print method result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *serviceVcsSensorGetFingerprintAsync+0x232
+commands
+  silent
+  printf "  vcsFPServiceStartGetPrintThread result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+continue

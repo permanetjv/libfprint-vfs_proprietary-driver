@@ -163,6 +163,41 @@ bwrap_args=(
 )
 runtime_library_path=/opt/vendor/usr/lib64:/opt/openssl/usr/lib64:/opt/libusb/usr/lib64
 
+if [[ -n ${VFS495_SERVICE_GDB_PATH:-} ]]; then
+    [[ $component == stack ]] || {
+        echo "VFS495_SERVICE_GDB_PATH is supported only for the stack" >&2
+        exit 2
+    }
+    [[ -x $VFS495_SERVICE_GDB_PATH ]] || {
+        echo "VFS495_SERVICE_GDB_PATH is not executable" >&2
+        exit 2
+    }
+    service_gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-vcs-fp-service.commands
+    service_gdb_wrapper=$(dirname "${BASH_SOURCE[0]}")/gdb-vcs-fp-service-wrapper.sh
+    [[ -f $service_gdb_commands && -x $service_gdb_wrapper ]] || {
+        echo "vcsFPService GDB support files are missing" >&2
+        exit 2
+    }
+    bwrap_args+=(
+        --ro-bind "$service_gdb_wrapper" /opt/bin/vcsFPService-gdb
+        --ro-bind "$service_gdb_commands" /opt/bin/gdb-vcs-fp-service.commands
+    )
+    if [[ -z ${VFS495_CAPTURE_GDB_PATH:-} ]]; then
+        bwrap_args+=(--ro-bind "$VFS495_SERVICE_GDB_PATH" /opt/bin/gdb)
+        if [[ -n ${VFS495_SERVICE_GDB_LIB_ROOT:-} ]]; then
+            [[ -d $VFS495_SERVICE_GDB_LIB_ROOT ]] || {
+                echo "VFS495_SERVICE_GDB_LIB_ROOT is not a directory" >&2
+                exit 2
+            }
+            bwrap_args+=(--ro-bind "$VFS495_SERVICE_GDB_LIB_ROOT" /opt/gdb-libs)
+            runtime_library_path=/opt/gdb-libs:$runtime_library_path
+        fi
+    elif [[ $VFS495_SERVICE_GDB_PATH != "$VFS495_CAPTURE_GDB_PATH" ]]; then
+        echo "service and capture GDB paths must match when both traces are enabled" >&2
+        exit 2
+    fi
+fi
+
 if [[ $component == helper || $component == stack ]]; then
     if [[ -n ${VFS495_CAPTURE_GDB_PATH:-} ]]; then
         [[ -x $VFS495_CAPTURE_GDB_PATH ]] || {
