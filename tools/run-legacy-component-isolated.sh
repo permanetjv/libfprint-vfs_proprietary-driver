@@ -221,8 +221,8 @@ if [[ -n ${VFS495_GDB_PATH:-} ]]; then
             echo "refusing provisioning without the exact OTP acknowledgement token" >&2
             exit 2
         fi
-        if [[ $# -ne 3 || $1 != setowner || $2 != vfs495 || $3 != -doinit ]]; then
-            echo "provisioning requires exactly: initializer setowner vfs495 -doinit" >&2
+        if [[ $# -ne 2 || $1 != setowner || $2 != -doinit ]]; then
+            echo "provisioning requires exactly: initializer setowner -doinit" >&2
             exit 2
         fi
         : "${VFS495_PROVISION_EXPECTED_INITIALIZER_SHA256:?set the audited initializer SHA-256}"
@@ -272,6 +272,9 @@ if [[ -n ${VFS495_GDB_PATH:-} ]]; then
         ;;
       security_info)
         gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-security-info.commands
+        ;;
+      provision_vfs495_preflight)
+        gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-provision-vfs495-preflight.commands
         ;;
       '')
         gdb_commands=

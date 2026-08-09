@@ -3,14 +3,43 @@ set startup-with-shell off
 set debuginfod enabled off
 set confirm off
 
-# The audited HP 4.5-136.0 initializer disables its public provision command.
-# After normal option parsing and sensor initialization, replace only the
-# selected setowner dispatch target with its internal SensorProvision handler.
-break *0x4404a2
+# The audited HP 4.5-136.0 initializer's main permits only setowner -doinit.
+# Once main has accepted that request, insert the VFS495 model argument for
+# Execute. Reuse argv[0]'s writable buffer because main no longer needs it.
+break Execute
 commands 1
+  silent
+  if $rdi != 3
+    printf "Provisioning guard: unexpected initial argc %d; aborting.\n", $rdi
+    kill
+    quit 4
+  end
+  set $vfs495_argv = $rsi
+  set *((char **) $vfs495_argv + 3) = *((char **) $vfs495_argv + 2)
+  set {char[7]} *((char **) $vfs495_argv) = "vfs495"
+  set *((char **) $vfs495_argv + 2) = *((char **) $vfs495_argv)
+  set $rdi = 4
+  continue
+end
+
+# After -doinit is removed, require argc 3, the literal vfs495 model argument,
+# and the original SensorSetOwner dispatch entry before changing its target.
+break *0x4404a2
+commands 2
   silent
   if $ebp != 3
     printf "Provisioning guard: unexpected processed argc %d; aborting.\n", $ebp
+    kill
+    quit 4
+  end
+  set $vfs495_arg = *((char **) $r15 + 2)
+  if *(char *) ($vfs495_arg + 0) != 'v' || *(char *) ($vfs495_arg + 1) != 'f' || *(char *) ($vfs495_arg + 2) != 's' || *(char *) ($vfs495_arg + 3) != '4' || *(char *) ($vfs495_arg + 4) != '9' || *(char *) ($vfs495_arg + 5) != '5' || *(char *) ($vfs495_arg + 6) != 0
+    printf "Provisioning guard: model argument mismatch; aborting.\n"
+    kill
+    quit 4
+  end
+  if *(void **) ($rbx + 8) != SensorSetOwner
+    printf "Provisioning guard: original handler mismatch; aborting.\n"
     kill
     quit 4
   end
@@ -19,15 +48,22 @@ commands 1
   continue
 end
 
+break SensorProvision
+commands 3
+  silent
+  printf "Entered SensorProvision with argc %d and model %s.\n", $rdi, *((char **) $rsi + 2)
+  continue
+end
+
 break *0x43abef
-commands 2
+commands 4
   silent
   printf "vcsTestSensorProvision result: 0x%x (%d)\n", $eax, $eax
   continue
 end
 
 break *0x43ac1d
-commands 3
+commands 5
   silent
   printf "vcsTestSensorOtpWrite result: 0x%x (%d)\n", $eax, $eax
   continue
