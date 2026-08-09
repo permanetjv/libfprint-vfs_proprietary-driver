@@ -67,7 +67,8 @@ git -C "$repo_root" archive \
     --format=tar.gz \
     --prefix="libfprint-vfs495-port-$vfs495_commit/" \
     "$vfs495_commit" \
-    vfs_proprietary tests tools/raw-capture.py >"$archive"
+    vfs_proprietary tests packaging/systemd \
+    tools/raw-capture.py tools/monitor-vfs495-usb-mirror.sh >"$archive"
 
 rpmbuild -ba --quiet \
     --define "_topdir $output_root" \

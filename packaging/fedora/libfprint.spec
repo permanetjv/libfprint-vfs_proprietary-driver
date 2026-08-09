@@ -1,8 +1,8 @@
-%global vfs495_commit 3e2cb84d7ee5388c7670cfb02b7d101312b275a2
+%global vfs495_commit 05006f158b62921f5a3af8a26b4e045308394a39
 
 Name:           libfprint
 Version:        1.94.10
-Release:        5.vfs495.4%{?dist}
+Release:        5.vfs495.5%{?dist}
 Summary:        Toolkit for fingerprint scanners with the VFS495 port
 
 # Most of libfprint and the VFS495 port are LGPL-2.1-or-later.
@@ -66,6 +66,24 @@ Requires:       %{name}%{?_isa} = %{version}-%{release}
 The %{name}-tests package contains tests that can be used to verify the
 functionality of the installed %{name} package.
 
+%package        vfs495-runtime
+Summary:        Isolated runtime integration for the VFS495 driver
+Requires:       %{name}%{?_isa} = %{version}-%{release}
+Requires:       fprintd
+Requires:       bubblewrap
+Requires:       procps-ng
+Requires:       libtommath
+Requires:       bash
+Requires:       coreutils
+Requires(post): systemd
+Requires(preun): systemd
+Requires(postun): systemd
+
+%description vfs495-runtime
+Open-source systemd and bubblewrap integration for an externally supplied,
+non-redistributable VFS495 vendor runtime. This package contains no vendor
+binaries, firmware, keys, or sensor state.
+
 %prep
 %autosetup -S git -n libfprint-v%{version}
 tar -xzf %{SOURCE1}
@@ -79,6 +97,19 @@ cp -a libfprint-vfs495-port-%{vfs495_commit}/vfs_proprietary \
 
 %install
 %meson_install
+port_root=libfprint-vfs495-port-%{vfs495_commit}
+install -Dpm0755 "$port_root/tools/monitor-vfs495-usb-mirror.sh" \
+  %{buildroot}%{_libexecdir}/vfs495/vfs495-usb-mirror
+install -Dpm0755 "$port_root/packaging/systemd/vfs495-vendor-supervisor" \
+  %{buildroot}%{_libexecdir}/vfs495/vfs495-vendor-supervisor
+install -Dpm0755 "$port_root/packaging/systemd/vfs495-vendor-inner-supervisor" \
+  %{buildroot}%{_libexecdir}/vfs495/vfs495-vendor-inner-supervisor
+install -Dpm0644 "$port_root/packaging/systemd/vfs495-usb-mirror.service" \
+  %{buildroot}%{_unitdir}/vfs495-usb-mirror.service
+install -Dpm0644 "$port_root/packaging/systemd/vfs495-vendor.service" \
+  %{buildroot}%{_unitdir}/vfs495-vendor.service
+install -Dpm0644 "$port_root/packaging/systemd/60-vfs495-runtime.conf" \
+  %{buildroot}%{_unitdir}/fprintd.service.d/60-vfs495-runtime.conf
 
 %check
 %set_build_flags
@@ -103,6 +134,15 @@ test -x "$hwdb_generator"
 
 %ldconfig_scriptlets
 
+%post vfs495-runtime
+%systemd_post vfs495-usb-mirror.service vfs495-vendor.service
+
+%preun vfs495-runtime
+%systemd_preun vfs495-usb-mirror.service vfs495-vendor.service
+
+%postun vfs495-runtime
+%systemd_postun_with_restart vfs495-usb-mirror.service vfs495-vendor.service
+
 %files
 %license COPYING
 %doc NEWS THANKS AUTHORS README.md
@@ -125,9 +165,18 @@ test -x "$hwdb_generator"
 %{_libexecdir}/installed-tests/libfprint-2/
 %{_datadir}/installed-tests/libfprint-2/
 
+%files vfs495-runtime
+%doc libfprint-vfs495-port-%{vfs495_commit}/packaging/systemd/runtime.conf.example
+%{_libexecdir}/vfs495/
+%{_unitdir}/vfs495-usb-mirror.service
+%{_unitdir}/vfs495-vendor.service
+%dir %{_unitdir}/fprintd.service.d
+%{_unitdir}/fprintd.service.d/60-vfs495-runtime.conf
+
 %changelog
-* Sun Aug 09 2026 PermaNet JV <permanetjv@users.noreply.github.com> - 1.94.10-5.vfs495.4
+* Sun Aug 09 2026 PermaNet JV <permanetjv@users.noreply.github.com> - 1.94.10-5.vfs495.5
 - Add the open-source VFS495 port to Fedora 44's libfprint package
 - Keep VFS495 out of libfprint's USB autosuspend allowlist
 - Scope compatibility-library lookup to the capture-helper child
+- Add a separate persistent, isolated vendor-runtime integration subpackage
 - Keep the non-redistributable vendor capture runtime outside the RPM

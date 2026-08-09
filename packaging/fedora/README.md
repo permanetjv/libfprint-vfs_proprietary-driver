@@ -27,11 +27,18 @@ port commit, runs the port's tests during `%check`, and writes results below
 Before installation, inspect the RPM manifest and dependencies:
 
 ```sh
-rpm -qpl build/fedora-44/RPMS/*/libfprint-1.94.10-5.vfs495.4.fc44.*.rpm
-rpm -qpR build/fedora-44/RPMS/*/libfprint-1.94.10-5.vfs495.4.fc44.*.rpm
+rpm -qpl build/fedora-44/RPMS/*/libfprint-1.94.10-5.vfs495.5.fc44.*.rpm
+rpm -qpR build/fedora-44/RPMS/*/libfprint-1.94.10-5.vfs495.5.fc44.*.rpm
 ```
 
 ## Transactional install and rollback
+
+The optional `libfprint-vfs495-runtime` RPM contains only open-source service
+integration. Before installing it, stage the external compatibility roots
+under `/var/lib/vfs495-runtime`, copy `runtime.conf.example` to
+`/etc/vfs495/runtime.conf`, and verify its pinned hashes. The fprintd drop-in
+passes legacy library paths only to capture-helper children and joins the
+vendor service's systemd-created private `/tmp` and IPC namespaces.
 
 After raw capture and the production isolation configuration are verified:
 
