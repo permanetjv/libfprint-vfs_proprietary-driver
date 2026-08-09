@@ -244,8 +244,11 @@ if [[ -n ${VFS495_SERVICE_GDB_PATH:-} ]]; then
     fi
     flex_id_compat=${VFS495_SERVICE_FLEX_ID_COMPAT:-}
     if [[ -n $flex_id_compat ]]; then
-        if [[ $no_ssl_compat != I_ACCEPT_VFS495_VENDOR_NO_SSL_MODE ]]; then
-            echo "VFS495 Flex-ID compatibility also requires vendor no-SSL mode" >&2
+        # Flex ID selection is independent of the transport security mode.
+        # Require the same audited service and exact-device guards supplied by
+        # RAW-hash compatibility, but permit either normal SSL or -nossl.
+        if [[ $raw_hash_compat != I_ACCEPT_VFS495_RAW_HASH_CHECK_BYPASS ]]; then
+            echo "VFS495 Flex-ID compatibility also requires RAW-hash compatibility" >&2
             exit 2
         fi
         expected_ack=I_ACCEPT_VFS495_FLEX_ID_0X83
