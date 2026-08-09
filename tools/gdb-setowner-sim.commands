@@ -4,6 +4,20 @@ set debuginfod enabled off
 set startup-with-shell off
 set breakpoint pending on
 
+break SensorSetOwnerSim
+commands
+  silent
+  printf "setowner_sim command handler entered\n"
+  continue
+end
+
+break *SensorSetOwnerSim+0x4a
+commands
+  silent
+  printf "setowner_sim version-query result: 0x%x (%d): %s\n", $eax, $eax, (char *) SensorResultStatus((int) $eax)
+  continue
+end
+
 break vcsTestSimulateTakeOwnership
 commands
   silent
