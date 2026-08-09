@@ -241,6 +241,10 @@ break *scsFalconDeviceInit+0x782
 commands
   silent
   printf "  Falcon RAW-partition integrity result: 0x%x (%d), mismatch=%u\n", $eax, $eax, *(unsigned int *)($rsp + 0x368)
+  if $vfs495_raw_hash_compat == 1 && $eax == 0x176
+    printf "  applying guarded VFS495 missing-RAW-hash compatibility\n"
+    set $eax = 0
+  end
   continue
 end
 

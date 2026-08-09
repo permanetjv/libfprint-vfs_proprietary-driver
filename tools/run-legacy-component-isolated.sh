@@ -37,6 +37,15 @@ if [[ ! $VFS495_USB_DEVICE =~ ^/dev/bus/usb/[0-9]{3}/[0-9]{3}$ ]] ||
     exit 2
 fi
 usb_bus_dir=${VFS495_USB_DEVICE%/*}
+usb_major_hex=$(stat -c %t "$VFS495_USB_DEVICE")
+usb_minor_hex=$(stat -c %T "$VFS495_USB_DEVICE")
+usb_sysfs=/sys/dev/char/$((16#$usb_major_hex)):$((16#$usb_minor_hex))
+if [[ ! -r $usb_sysfs/idVendor || ! -r $usb_sysfs/idProduct ]] ||
+   [[ $(<"$usb_sysfs/idVendor") != 138a ]] ||
+   [[ $(<"$usb_sysfs/idProduct") != 003f ]]; then
+    echo "refusing non-VFS495 USB device: $VFS495_USB_DEVICE" >&2
+    exit 2
+fi
 
 case "$VFS495_USB_SCOPE" in
     node)
@@ -182,6 +191,44 @@ if [[ -n ${VFS495_SERVICE_GDB_PATH:-} ]]; then
         --ro-bind "$service_gdb_wrapper" /opt/bin/vcsFPService-gdb
         --ro-bind "$service_gdb_commands" /opt/bin/gdb-vcs-fp-service.commands
     )
+    raw_hash_compat=${VFS495_SERVICE_RAW_HASH_COMPAT:-}
+    if [[ -n $raw_hash_compat ]]; then
+        require_ac_power
+        expected_ack=I_ACCEPT_VFS495_RAW_HASH_CHECK_BYPASS
+        if [[ $raw_hash_compat != "$expected_ack" ]]; then
+            echo "refusing RAW-hash compatibility without the exact acknowledgement token" >&2
+            exit 2
+        fi
+        : "${VFS495_SERVICE_EXPECTED_SHA256:?set the audited service SHA-256}"
+        if [[ ! $VFS495_SERVICE_EXPECTED_SHA256 =~ ^[0-9a-f]{64}$ ]]; then
+            echo "VFS495_SERVICE_EXPECTED_SHA256 must be 64 lowercase hex characters" >&2
+            exit 2
+        fi
+        actual_service_sha256=$(sha256sum \
+            "$VFS495_VENDOR_ROOT/usr/bin/vcsFPService" | awk '{print $1}')
+        if [[ $actual_service_sha256 != "$VFS495_SERVICE_EXPECTED_SHA256" ]]; then
+            echo "refusing RAW-hash compatibility with an unaudited service binary" >&2
+            exit 2
+        fi
+        if [[ $VFS495_USB_SCOPE != mirror ]]; then
+            echo "RAW-hash compatibility requires the re-enumeration-safe USB mirror" >&2
+            exit 2
+        fi
+        : "${VFS495_SERVICE_MIRROR_MONITOR_PID:?set the live USB mirror monitor PID}"
+        if [[ ! $VFS495_SERVICE_MIRROR_MONITOR_PID =~ ^[1-9][0-9]*$ ]] ||
+           ! kill -0 "$VFS495_SERVICE_MIRROR_MONITOR_PID" 2>/dev/null; then
+            echo "refusing RAW-hash compatibility without a live USB mirror monitor" >&2
+            exit 2
+        fi
+        mirrored_usb_device=$VFS495_USB_MIRROR${VFS495_USB_DEVICE#/dev/bus/usb}
+        if [[ ! -c $mirrored_usb_device ]] ||
+           [[ $(stat -c %t:%T "$mirrored_usb_device") != \
+              $(stat -c %t:%T "$VFS495_USB_DEVICE") ]]; then
+            echo "refusing RAW-hash compatibility with a stale USB mirror device" >&2
+            exit 2
+        fi
+        bwrap_args+=(--setenv VFS495_SERVICE_RAW_HASH_COMPAT_ENABLED 1)
+    fi
     if [[ -z ${VFS495_CAPTURE_GDB_PATH:-} ]]; then
         bwrap_args+=(--ro-bind "$VFS495_SERVICE_GDB_PATH" /opt/bin/gdb)
         if [[ -n ${VFS495_SERVICE_GDB_LIB_ROOT:-} ]]; then
