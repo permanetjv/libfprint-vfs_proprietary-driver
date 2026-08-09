@@ -84,8 +84,18 @@ esac
 
 install -d -m 0700 \
     "$VFS495_STATE_ROOT/tmp" \
-    "$VFS495_STATE_ROOT/run" \
-    "$VFS495_STATE_ROOT/persistent"
+    "$VFS495_STATE_ROOT/run"
+
+persistent_data=$VFS495_STATE_ROOT/ValidityPersistentData
+if [[ -e $persistent_data ]]; then
+    if [[ ! -f $persistent_data || -L $persistent_data ]]; then
+        echo "$persistent_data must be a regular, non-symlink file" >&2
+        exit 2
+    fi
+    chmod 0600 "$persistent_data"
+else
+    install -m 0600 /dev/null "$persistent_data"
+fi
 
 network_bwrap_args=(--unshare-net)
 udev_bwrap_args=()
@@ -120,8 +130,7 @@ bwrap_args=(
     --bind "$VFS495_STATE_ROOT/run" /run
     "${udev_bwrap_args[@]}"
     --tmpfs /etc
-    --dir /etc/ValidityPersistentData
-    --bind "$VFS495_STATE_ROOT/persistent" /etc/ValidityPersistentData
+    --bind "$persistent_data" /etc/ValidityPersistentData
     --tmpfs /opt
     --dir /opt/vendor
     --dir /opt/openssl

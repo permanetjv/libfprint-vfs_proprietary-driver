@@ -21,6 +21,12 @@ it can follow the reader when firmware loading changes the USB device number.
 The surrounding transient systemd unit restricts address families to
 `AF_UNIX` and `AF_NETLINK` and denies IP networking.
 
+`/etc/ValidityPersistentData` is a single vendor binary data file, not a
+directory. The launcher creates it as a private `0600` regular file and bind
+mounts only that file. Mounting a directory at this path causes
+`vcsSensorSetOwner` to return `0xcf` (`VCS_RESULT_FILE_OPEN_FAILED`) before the
+actual sensor-policy result can be observed.
+
 ## Port and build evidence
 
 `tools/prepare-libfprint-1.94.10.sh` requires a clean checkout at the exact
@@ -50,7 +56,8 @@ communicate through the vendor service IPC. The original acquisition path then
 fails at `GroupGetFingerprint` because no secure session can be established
 with the reader.
 
-The ownership investigation produced these results:
+The ownership investigation produced these results both before and after the
+BIOS update and firmware-level fingerprint reset described below:
 
 - `sensorstat`: the sensor is secure and no secure session is established;
 - `resetowner -doinit`: reports success;
@@ -64,27 +71,30 @@ change the result. No fingerprint image has been saved. The current verdict is
 therefore: kernel 7.1 transport works, while raw capture remains blocked by the
 sensor firmware's ownership policy.
 
-## Required firmware action
+## BIOS update and fingerprint-reset result
 
-The vendor README says to reset the fingerprint sensor in BIOS before retrying
-first-time ownership. On this HP generation the preferred narrow action is:
+The EliteBook was updated from HP N75 01.57 to the latest applicable HP N75
+01.62 firmware. Post-flash checks report `N75 Ver. 01.62`, firmware date
+2024-03-17, Secure Boot enabled, kernel 7.1.7, and a normally enumerated VFS495.
+The dedicated **Fingerprint Reset on Reboot** confirmation was also completed;
+the TPM and broader factory-security state were not cleared.
 
-1. Reboot and press `Esc`, then `F10` for Computer Setup.
-2. Open **Security** and set **Fingerprint Reset on Reboot** to **Yes** (wording
-   may vary slightly).
-3. Save changes and exit. Accept a dedicated **Reset Fingerprint Sensor**
-   confirmation with `F1` if it appears.
-4. Do not clear the TPM or choose a broader factory-security reset for this
-   driver test.
+The first isolated `setowner -doinit` after that reset loaded firmware and the
+USB mirror followed the reader from device number 003 to 005. With a fresh,
+regular `ValidityPersistentData` file, the vendor API still returned `0x172`
+(`VCS_RESULT_SENSOR_CMD_DENIED`). Follow-up read-only probes again reported a
+secure sensor with no secure session and 65,535 of 65,535 ownership cycles
+available. The reset therefore left the reader unowned but did not make the
+SetOwner command admissible.
 
-After Fedora starts, run the isolated `setowner -doinit` initializer once,
-retain its generated persistent owner data, and repeat raw capture before
-starting RPM or fprintd integration.
+Raw acquisition remains blocked at the ownership handshake. Firmware updating,
+BIOS reset, USB transport, re-enumeration, compatibility libraries, and local
+persistent-file layout have now been ruled out as the cause. Any attempt to use
+the vendor's one-time provisioning or locking commands needs separate protocol
+evidence first because those operations can permanently change sensor security
+state.
 
-The installed HP N75 firmware is 01.57. HP also documents N75 01.61 for the
-EliteBook 820/840/850 G3 and says that release fixes a fingerprint power-on
-authentication issue. A BIOS update has not been attempted and should be
-evaluated separately from the narrow fingerprint reset:
+References used for the firmware/reset investigation:
 
 - [HP December 2023 BIOS refresh for 2015 notebook PCs](https://support.hp.com/emea_middle_east-en/document/ish_9824930-9824982-16)
 - [HP BIOS security reset and fingerprint-sensor confirmation behavior](https://support.hp.com/ca-en/document/c07012053)
