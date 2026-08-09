@@ -248,6 +248,13 @@ commands
   continue
 end
 
+break *scsFalconDeviceInit+0x626
+commands
+  silent
+  printf "  Falcon stored RAW-hash lookup result: 0x%x (%d), storage_mode=%u init_flag=%u\n", $eax, $eax, *(unsigned int *)($rbx + 0x49c), *(unsigned int *)($r12 + 0x64)
+  continue
+end
+
 break *scsFalconDeviceInit+0x252
 commands
   silent
