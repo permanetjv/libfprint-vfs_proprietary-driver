@@ -339,7 +339,11 @@ end
 break *scsFalconDeviceInit+0xf06
 commands
   silent
-  printf "  Falcon secure-session action reached: flex_id=0x%x\n", *(unsigned int *)($rbx + 0x438)
+  printf "  Falcon secure-session action reached: callback_result=0x%x (%d) flex_id=0x%x\n", $r9d, $r9d, *(unsigned int *)($rbx + 0x438)
+  set $ssl_context = *(void **)($rbx + 0x1d8)
+  if $ssl_context != 0
+    printf "    SSL state before step=%u stored_result=0x%x (%d)\n", *(unsigned char *)($ssl_context + 0x4e4), *(unsigned int *)($ssl_context + 0x4e8), *(unsigned int *)($ssl_context + 0x4e8)
+  end
   continue
 end
 
@@ -357,7 +361,7 @@ end
 break *scsFalconDeviceInit+0xf3d
 commands
   silent
-  printf "  Falcon secure-session state: %u\n", $eax
+  printf "  Falcon secure-session established: %u\n", $eax
   continue
 end
 
