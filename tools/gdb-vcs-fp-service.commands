@@ -144,4 +144,32 @@ commands
   continue
 end
 
+break idsSensorPickImageReconstructor
+commands
+  silent
+  printf "idsSensorPickImageReconstructor sensor=%p\n", $rdi
+  continue
+end
+
+break *idsSensorPickImageReconstructor+0x50
+commands
+  silent
+  printf "  scsSensorGetFlexId result: 0x%x (%d), flex_id=0x%x\n", $eax, $eax, *(unsigned int *)($rsp + 0x1c)
+  continue
+end
+
+break *idsSensorPickImageReconstructor+0x7c
+commands
+  silent
+  printf "  scsSensorGetDriverVersion result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *idsSensorPickImageReconstructor+0xc2
+commands
+  silent
+  printf "  idsStartupIr result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
 continue
