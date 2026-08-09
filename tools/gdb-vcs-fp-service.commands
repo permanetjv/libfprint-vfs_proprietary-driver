@@ -67,4 +67,81 @@ commands
   continue
 end
 
+break _vcsSensorPrepareGetFingerprintContext
+commands
+  silent
+  printf "  preparing fingerprint context with path: %s\n", (char *)$rsi
+  continue
+end
+
+break *_vcsSensorPrepareGetFingerprintContext+0x4e
+commands
+  silent
+  printf "    vcsSensorValidate result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *_vcsSensorPrepareGetFingerprintContext+0x6a
+commands
+  silent
+  printf "    reconstructed-image size result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *_vcsSensorPrepareGetFingerprintContext+0xb0
+commands
+  silent
+  printf "    image allocation result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *_vcsSensorPrepareGetFingerprintContext+0xdc
+commands
+  silent
+  printf "    capture-metrics result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *_vcsSensorPrepareGetFingerprintContext+0xfc
+commands
+  silent
+  printf "    capture-mode result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *_vcsSensorPrepareGetFingerprintContext+0x112
+commands
+  silent
+  printf "    sensor-context allocation result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *_vcsSensorPrepareGetFingerprintContext+0x128
+commands
+  silent
+  printf "    sensor-handle context result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *_vcsSensorPrepareGetFingerprintContext+0x13f
+commands
+  silent
+  printf "    file-path context result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *_vcsSensorPrepareGetFingerprintContext+0x15b
+commands
+  silent
+  printf "    capture-parameter context result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *vcsFPGetFingerprintIncludeESD+0xe8
+commands
+  silent
+  printf "  worker vcsSensorGetFingerprintAsyncA result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
 continue
