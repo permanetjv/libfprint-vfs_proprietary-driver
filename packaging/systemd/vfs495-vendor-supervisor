@@ -1,0 +1,127 @@
+#!/bin/bash
+set -euo pipefail
+
+vendor_root=${VFS495_VENDOR_ROOT:-/var/lib/vfs495-runtime/vendor}
+openssl_root=${VFS495_OPENSSL_ROOT:-/var/lib/vfs495-runtime/openssl}
+libusb_root=${VFS495_LIBUSB_ROOT:-/var/lib/vfs495-runtime/libusb}
+mirror_root=${VFS495_USB_MIRROR:-/dev/vfs495-usb}
+state_root=${STATE_DIRECTORY:-/var/lib/vfs495}
+ready_timeout=${VFS495_SERVICE_READY_TIMEOUT:-20}
+service_hash=${VFS495_SERVICE_SHA256:?VFS495_SERVICE_SHA256 is required}
+wrapper_hash=${VFS495_WRAPPER_SHA256:?VFS495_WRAPPER_SHA256 is required}
+
+if [[ ! $ready_timeout =~ ^[1-9][0-9]*$ ]] || ((ready_timeout > 120)); then
+    echo "VFS495_SERVICE_READY_TIMEOUT must be an integer from 1 through 120" >&2
+    exit 64
+fi
+for root in "$vendor_root" "$openssl_root" "$libusb_root"; do
+    [[ -d $root && ! -L $root ]] || {
+        echo "invalid VFS495 runtime root: $root" >&2
+        exit 2
+    }
+done
+[[ $mirror_root == /dev/vfs495-usb && -d $mirror_root ]] || {
+    echo "the validated VFS495 USB mirror is unavailable" >&2
+    exit 2
+}
+
+service=$vendor_root/usr/bin/vcsFPService
+wrapper=$vendor_root/usr/lib64/libvfsFprintWrapper.so
+for binary in "$service" "$wrapper"; do
+    [[ -f $binary && ! -L $binary ]] || {
+        echo "missing regular runtime file: $binary" >&2
+        exit 2
+    }
+done
+[[ $service_hash =~ ^[0-9a-f]{64}$ && $wrapper_hash =~ ^[0-9a-f]{64}$ ]]
+[[ $(sha256sum "$service" | awk '{print $1}') == "$service_hash" ]] || {
+    echo "vcsFPService does not match the audited hash" >&2
+    exit 2
+}
+[[ $(sha256sum "$wrapper" | awk '{print $1}') == "$wrapper_hash" ]] || {
+    echo "libvfsFprintWrapper.so does not match the audited hash" >&2
+    exit 2
+}
+
+install -d -m 0700 "$state_root"
+persistent_data=$state_root/ValidityPersistentData
+if [[ -e $persistent_data ]]; then
+    [[ -f $persistent_data && ! -L $persistent_data ]] || {
+        echo "$persistent_data must be a regular, non-symlink file" >&2
+        exit 2
+    }
+    chmod 0600 "$persistent_data"
+else
+    install -m 0600 /dev/null "$persistent_data"
+fi
+
+inner=/usr/libexec/vfs495/vfs495-vendor-inner-supervisor
+runtime_library_path=/opt/vendor/usr/lib64:/opt/openssl/usr/lib64:/opt/libusb/usr/lib64
+bwrap=(
+    /usr/bin/bwrap
+    --unshare-net
+    --unshare-pid
+    --new-session
+    --die-with-parent
+    --cap-drop ALL
+    --ro-bind / /
+    --proc /proc
+    --dev /dev
+    --dir /dev/bus
+    --dev-bind "$mirror_root" /dev/bus/usb
+    --bind /tmp /tmp
+    --tmpfs /run
+    --tmpfs /etc
+    --bind "$persistent_data" /etc/ValidityPersistentData
+    --tmpfs /opt
+    --dir /opt/vendor
+    --dir /opt/openssl
+    --dir /opt/libusb
+    --dir /opt/bin
+    --ro-bind "$vendor_root" /opt/vendor
+    --ro-bind "$openssl_root" /opt/openssl
+    --ro-bind "$libusb_root" /opt/libusb
+    --tmpfs /usr/bin
+    --ro-bind /usr/bin/bash /usr/bin/sh
+    --ro-bind /usr/bin/pidof /usr/bin/pidof
+    --ro-bind /usr/bin/rm /usr/bin/rm
+    --ro-bind /usr/bin/sleep /usr/bin/sleep
+    --ro-bind "$vendor_root/usr/sbin/HPUsbVFS.img" /usr/bin/HPUsbVFS.img
+    --ro-bind "$vendor_root/usr/sbin/HPUsbVFS471.img" /usr/bin/HPUsbVFS471.img
+    --ro-bind "$vendor_root/usr/sbin/HPUsbVFS491.img" /usr/bin/HPUsbVFS491.img
+    --ro-bind "$vendor_root/usr/sbin/HPUsbVFS495.img" /usr/bin/HPUsbVFS495.img
+    --ro-bind "$inner" /opt/bin/vfs495-vendor-inner-supervisor
+    --setenv LD_LIBRARY_PATH "$runtime_library_path"
+    --setenv PATH /usr/bin
+    /usr/bin/sh /opt/bin/vfs495-vendor-inner-supervisor
+)
+
+# shellcheck disable=SC2329 # invoked by trap
+cleanup() {
+    if [[ -n ${bwrap_pid:-} ]]; then
+        kill -TERM "$bwrap_pid" 2>/dev/null || true
+        wait "$bwrap_pid" 2>/dev/null || true
+    fi
+    rm -f /tmp/vcsSemKey_* /tmp/CH_*
+}
+trap cleanup EXIT HUP INT TERM
+
+rm -f /tmp/vcsSemKey_* /tmp/CH_*
+"${bwrap[@]}" &
+bwrap_pid=$!
+
+for ((attempt = 0; attempt < ready_timeout * 10; attempt++)); do
+    if [[ -e /tmp/vcsSemKey_ServiceReady ]]; then
+        systemd-notify --ready --status="VFS495 vendor service is ready"
+        wait "$bwrap_pid"
+        exit $?
+    fi
+    kill -0 "$bwrap_pid" 2>/dev/null || {
+        wait "$bwrap_pid"
+        exit $?
+    }
+    sleep 0.1
+done
+
+echo "vcsFPService did not become ready within ${ready_timeout} seconds" >&2
+exit 1

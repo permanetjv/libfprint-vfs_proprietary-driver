@@ -76,7 +76,7 @@ load_vfs_wrapper(struct vfs_wrapper_api * const api,
 	const char * wrapper_path = getenv("VFS_PROPRIETARY_WRAPPER_PATH");
 
 	if ( tommath_path == NULL || tommath_path[0] == '\0' )
-		tommath_path = "libtommath.so";
+		tommath_path = "libtommath.so.1";
 	if ( wrapper_path == NULL || wrapper_path[0] == '\0' )
 		wrapper_path = "libvfsFprintWrapper.so";
 

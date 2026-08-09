@@ -1,0 +1,43 @@
+[Unit]
+Description=Isolated persistent VFS495 vendor capture service
+Requires=vfs495-usb-mirror.service
+After=vfs495-usb-mirror.service
+Before=fprintd.service
+ConditionPathExists=/etc/vfs495/runtime.conf
+
+[Service]
+Type=notify
+NotifyAccess=main
+EnvironmentFile=/etc/vfs495/runtime.conf
+ExecStart=/usr/libexec/vfs495/vfs495-vendor-supervisor
+Restart=on-failure
+RestartSec=1s
+TimeoutStartSec=30s
+TimeoutStopSec=10s
+StateDirectory=vfs495
+StateDirectoryMode=0700
+
+PrivateTmp=true
+PrivateIPC=true
+PrivateDevices=false
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+IPAddressDeny=any
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_SETUID CAP_SETGID
+NoNewPrivileges=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+SystemCallArchitectures=native
+DeviceAllow=char-usb_device rw
+PrivateMounts=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
