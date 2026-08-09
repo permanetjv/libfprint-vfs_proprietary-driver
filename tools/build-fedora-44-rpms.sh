@@ -7,6 +7,11 @@ output_root=${2:-$repo_root/build/fedora-44}
 spec=$repo_root/packaging/fedora/libfprint.spec
 expected_distgit_commit=92d8aa1d4a5a756f8090cccf1fe903c025f7225f
 
+if [[ -n $(git -C "$repo_root" status --porcelain --untracked-files=no) ]]; then
+    echo "tracked fork files must be committed before building RPMs" >&2
+    exit 2
+fi
+
 command -v fedpkg >/dev/null || {
     echo "fedpkg is required; install it with sudo dnf inside the toolbox" >&2
     exit 2
@@ -68,4 +73,6 @@ rpmbuild -ba --quiet \
     --define "_topdir $output_root" \
     "$output_root/SPECS/$(basename "$spec")"
 
-find "$output_root/RPMS" "$output_root/SRPMS" -type f -name '*.rpm' -print | sort
+current_release=$(rpmspec -q --srpm --qf '%{VERSION}-%{RELEASE}' "$spec")
+find "$output_root/RPMS" "$output_root/SRPMS" -type f \
+    -name "*-$current_release*.rpm" -print | sort
