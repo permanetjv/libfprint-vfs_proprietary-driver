@@ -1,0 +1,36 @@
+set pagination off
+set startup-with-shell off
+set debuginfod enabled off
+set confirm off
+
+# The audited HP 4.5-136.0 initializer disables its public provision command.
+# After normal option parsing and sensor initialization, replace only the
+# selected setowner dispatch target with its internal SensorProvision handler.
+break *0x4404a2
+commands 1
+  silent
+  if $ebp != 3
+    printf "Provisioning guard: unexpected processed argc %d; aborting.\n", $ebp
+    kill
+    quit 4
+  end
+  printf "Provisioning guard passed; dispatching SensorProvision.\n"
+  set *(void **) ($rbx + 8) = SensorProvision
+  continue
+end
+
+break *0x43abef
+commands 2
+  silent
+  printf "vcsTestSensorProvision result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *0x43ac1d
+commands 3
+  silent
+  printf "vcsTestSensorOtpWrite result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+run
