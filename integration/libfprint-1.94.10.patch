@@ -32,6 +32,17 @@ diff --git a/libfprint/meson.build b/libfprint/meson.build
      sources: drivers_sources,
      c_args: drivers_cflags,
      dependencies: deps,
+diff --git a/data/autosuspend.hwdb b/data/autosuspend.hwdb
+--- a/data/autosuspend.hwdb
++++ b/data/autosuspend.hwdb
+@@ -425,7 +425,6 @@ usb:v1188p9545*
+ usb:v138Ap003A*
+ usb:v138Ap003C*
+ usb:v138Ap003D*
+-usb:v138Ap003F*
+ usb:v138Ap0090*
+ usb:v138Ap0092*
+ usb:v138Ap0094*
 diff --git a/libfprint/fprint-list-udev-hwdb.c b/libfprint/fprint-list-udev-hwdb.c
 --- a/libfprint/fprint-list-udev-hwdb.c
 +++ b/libfprint/fprint-list-udev-hwdb.c
