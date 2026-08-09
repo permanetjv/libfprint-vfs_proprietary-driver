@@ -33,6 +33,7 @@
 #include <unistd.h>  /* alarm, write, close */
 #include <syslog.h>  /* openlog, syslog */
 #include <errno.h>   /* errno, E* */
+#include <dlfcn.h>  /* dlopen, dlsym, dlclose */
 
 #include <sys/stat.h> /* stat */
 
@@ -51,6 +52,82 @@
 
 
 static const char * g_sigalrm_msg = "";
+
+struct vfs_wrapper_api
+{
+	int (*dev_init)(struct vfsw_data *);
+	int (*wait_for_service)(void);
+	int (*set_matcher_type)(enum vfs_matcher_type);
+	enum vfsw_capture_result (*capture)(struct vfsw_data *, int);
+	int (*get_img_datasize)(struct vfsw_data *);
+	int (*get_img_width)(struct vfsw_data *);
+	int (*get_img_height)(struct vfsw_data *);
+	unsigned char * (*get_img_data)(struct vfsw_data *);
+	void (*free_img_data)(unsigned char *);
+	void (*clean_handles)(struct vfsw_data *);
+	void (*dev_exit)(struct vfsw_data *);
+};
+
+static int
+load_vfs_wrapper(struct vfs_wrapper_api * const api,
+		void ** const tommath_handle, void ** const wrapper_handle)
+{
+	const char * tommath_path = getenv("VFS_PROPRIETARY_TOMMATH_PATH");
+	const char * wrapper_path = getenv("VFS_PROPRIETARY_WRAPPER_PATH");
+
+	if ( tommath_path == NULL || tommath_path[0] == '\0' )
+		tommath_path = "libtommath.so";
+	if ( wrapper_path == NULL || wrapper_path[0] == '\0' )
+		wrapper_path = "libvfsFprintWrapper.so";
+
+	*tommath_handle = dlopen(tommath_path, RTLD_NOW | RTLD_GLOBAL);
+	if ( *tommath_handle == NULL )
+	{
+		fprintf(stderr, "Failed to load %s: %s\n", tommath_path, dlerror());
+		return EXIT_FAILURE;
+	}
+
+	*wrapper_handle = dlopen(wrapper_path, RTLD_NOW | RTLD_GLOBAL);
+	if ( *wrapper_handle == NULL )
+	{
+		fprintf(stderr, "Failed to load %s: %s\n", wrapper_path, dlerror());
+		return EXIT_FAILURE;
+	}
+
+#define LOAD_VFS_SYMBOL(_field_, _symbol_)                                      \
+	do {                                                                       \
+		void * symbol_address;                                                 \
+		const char * symbol_error;                                             \
+		dlerror();                                                              \
+		symbol_address = dlsym(*wrapper_handle, #_symbol_);                     \
+		symbol_error = dlerror();                                               \
+		if ( symbol_error != NULL || symbol_address == NULL )                   \
+		{                                                                      \
+			fprintf(stderr, "Failed to resolve %s: %s\n", #_symbol_,          \
+					symbol_error != NULL ? symbol_error : "symbol is null"); \
+			return EXIT_FAILURE;                                                \
+		}                                                                      \
+		_Static_assert(sizeof(api->_field_) == sizeof(symbol_address),          \
+				"POSIX function and data pointers must have equal size");       \
+		memcpy(&api->_field_, &symbol_address, sizeof(api->_field_));           \
+	} while (0)
+
+	LOAD_VFS_SYMBOL(dev_init, vfs_dev_init);
+	LOAD_VFS_SYMBOL(wait_for_service, vfs_wait_for_service);
+	LOAD_VFS_SYMBOL(set_matcher_type, vfs_set_matcher_type);
+	LOAD_VFS_SYMBOL(capture, vfs_capture);
+	LOAD_VFS_SYMBOL(get_img_datasize, vfs_get_img_datasize);
+	LOAD_VFS_SYMBOL(get_img_width, vfs_get_img_width);
+	LOAD_VFS_SYMBOL(get_img_height, vfs_get_img_height);
+	LOAD_VFS_SYMBOL(get_img_data, vfs_get_img_data);
+	LOAD_VFS_SYMBOL(free_img_data, vfs_free_img_data);
+	LOAD_VFS_SYMBOL(clean_handles, vfs_clean_handles);
+	LOAD_VFS_SYMBOL(dev_exit, vfs_dev_exit);
+
+#undef LOAD_VFS_SYMBOL
+
+	return EXIT_SUCCESS;
+}
 
 
 /***
@@ -104,6 +181,9 @@ main(int const argc, char * const argv[])
 	bool vfs_initialized = false;
 	struct vfsw_data vfsw_data = { 0 };
 	unsigned char * vfsw_img_data = NULL;
+	struct vfs_wrapper_api vfs_api = { 0 };
+	void * tommath_handle = NULL;
+	void * wrapper_handle = NULL;
 
 	ASSERT_PERROR( signal(SIGALRM, sigalrm_handler) != SIG_ERR ,
 					errno, "Failed to setup signal handler");
@@ -112,6 +192,10 @@ main(int const argc, char * const argv[])
 	iretval = read(STDIN_FILENO, &ipcin, sizeof(ipcin));
 	ASSERT_PERROR( iretval == sizeof(ipcin) , errno, "Failed to read IPC in");
 	fclose(stdin);
+
+	iretval = load_vfs_wrapper(&vfs_api, &tommath_handle, &wrapper_handle);
+	ASSERT_PRINTF( iretval == EXIT_SUCCESS, EXIT_FAILURE,
+			"Failed to load the proprietary capture runtime");
 
 
 	/* simple check for https://github.com/rindeal/libfprint-vfs_proprietary-driver/issues/4 */
@@ -126,11 +210,11 @@ main(int const argc, char * const argv[])
 
 
 	EXECUTE_IN_TIME(5, "timed out waiting for VFS service",
-		iretval = vfs_wait_for_service();
+		iretval = vfs_api.wait_for_service();
 		ASSERT_VFSW_RESULT_OK(iretval, EXIT_FAILURE, "vfs_wait_for_service");
 	);
 	EXECUTE_IN_TIME(5, "timed out waiting for VFS wrapper to initialize",
-		iretval = vfs_set_matcher_type(VFS_FPRINT_MATCHER);
+		iretval = vfs_api.set_matcher_type(VFS_FPRINT_MATCHER);
 		ASSERT_VFSW_RESULT_OK(iretval, EXIT_FAILURE, "vfs_set_matcher_type");
 
 		/*
@@ -147,7 +231,7 @@ main(int const argc, char * const argv[])
 		 *     Sensor usb#vid_138a#pid_003f#... plugged.
 		 *
 		 */
-		iretval = vfs_dev_init(&vfsw_data);
+		iretval = vfs_api.dev_init(&vfsw_data);
 		ASSERT_VFSW_RESULT_OK(iretval, EXIT_FAILURE, "vfs_dev_init");
 	);
 	vfs_initialized = true;
@@ -182,7 +266,7 @@ main(int const argc, char * const argv[])
 		/* this will fail if some other instance tries the same while we're waiting for swipe */
 		for (unsigned int attempt = 1; attempt <= VFS_PROPRIETARY_CAPTURE_ATTEMPTS; attempt++)
 		{
-			iretval = vfs_capture(&vfsw_data, 1);
+			iretval = vfs_api.capture(&vfsw_data, 1);
 			if ( iretval == VFSW_CAPTURE_COMPLETE )
 				break;
 
@@ -208,10 +292,10 @@ main(int const argc, char * const argv[])
 		);
 		close(ipcin.img_ready_fd);
 
-		vfsw_img_data = vfs_get_img_data(&vfsw_data);
-		imgmeta.img_len = vfs_get_img_datasize(&vfsw_data);
-		imgmeta.img_w = vfs_get_img_width(&vfsw_data);
-		imgmeta.img_h = vfs_get_img_height(&vfsw_data);
+		vfsw_img_data = vfs_api.get_img_data(&vfsw_data);
+		imgmeta.img_len = vfs_api.get_img_datasize(&vfsw_data);
+		imgmeta.img_w = vfs_api.get_img_width(&vfsw_data);
+		imgmeta.img_h = vfs_api.get_img_height(&vfsw_data);
 		ASSERT_PRINTF( vfsw_img_data != NULL && imgmeta.img_len > 0 , EXIT_FAILURE, "Empty image captured");
 
 		ASSERT_PERROR(
@@ -239,13 +323,18 @@ cleanup:
 		EXECUTE_IN_TIME(2, "failed to cleanup vfs",
 			if ( vfsw_img_data != NULL )
 			{
-				vfs_free_img_data(vfsw_img_data);
+				vfs_api.free_img_data(vfsw_img_data);
 			}
 
-			vfs_clean_handles(&vfsw_data);
-			vfs_dev_exit(&vfsw_data);
+			vfs_api.clean_handles(&vfsw_data);
+			vfs_api.dev_exit(&vfsw_data);
 		);
 	}
+
+	if ( wrapper_handle != NULL )
+		dlclose(wrapper_handle);
+	if ( tommath_handle != NULL )
+		dlclose(tommath_handle);
 
 	return exit_code;
 }

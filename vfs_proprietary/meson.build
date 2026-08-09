@@ -1,12 +1,6 @@
 if drivers.contains('vfs_proprietary')
 
-	libvfsFprintWrapper_name = 'vfsFprintWrapper'
-	libvfsFprintWrapper_dir = get_variable('libvfsFprintWrapper_dir', '')
-	if libvfsFprintWrapper_dir == ''
-		libvfsFprintWrapper_dir = join_paths('/opt/validity-sensor/usr', get_option('libdir'))
-	endif
-	libvfsFprintWrapper = cc.find_library(libvfsFprintWrapper_name, dirs: [ libvfsFprintWrapper_dir ])
-	libtommath = cc.find_library('tommath')
+	libdl = cc.find_library('dl', required: false)
 
 	vfs_proprietary_capture_helper_dir = join_paths(get_option('prefix'), get_option('libexecdir'), meson.project_name())
 	vfs_proprietary_capture_helper_name = 'vfs_proprietary-capture-helper'
@@ -15,10 +9,9 @@ if drivers.contains('vfs_proprietary')
 		join_paths('capture-helper', 'main.c'),
 		join_paths('capture-helper', 'matcher_stubs.c'),
 		c_args: [ '-Werror' ],
-		dependencies: [ libvfsFprintWrapper, libtommath ],
+		dependencies: [ libdl ],
 		install: true,
 		install_dir: vfs_proprietary_capture_helper_dir,
-		install_rpath: libvfsFprintWrapper_dir,
 		link_args: [ '-Wl,--allow-shlib-undefined', '-Wl,--export-dynamic' ],
 	)
 

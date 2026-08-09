@@ -8,8 +8,19 @@ set -euo pipefail
 
 helper=$1
 
-readelf -d "$helper" | grep -Eq \
-    'Shared library: \[libtommath\.so(\.[0-9]+)*\]'
+if readelf -d "$helper" | grep -Eq \
+    'Shared library: \[(libtommath|libvfsFprintWrapper)\.so'; then
+    echo "capture helper must load proprietary runtime dependencies only at runtime" >&2
+    exit 1
+fi
+
+for symbol in \
+    dlopen \
+    dlsym; do
+    readelf --dyn-syms --wide "$helper" | awk -v expected="$symbol" \
+        '$7 == "UND" && ($8 == expected || $8 ~ ("^" expected "@")) { found = 1 }
+         END { exit !found }'
+done
 
 for symbol in \
     mssAdaptiveMatcherOpen \

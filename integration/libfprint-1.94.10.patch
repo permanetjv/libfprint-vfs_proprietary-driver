@@ -1,14 +1,3 @@
-diff --git a/meson_options.txt b/meson_options.txt
---- a/meson_options.txt
-+++ b/meson_options.txt
-@@ -26,3 +26,7 @@ option('installed-tests',
-        description: 'Whether to install the installed tests',
-        type: 'boolean',
-        value: true)
-+option('vfs_proprietary_wrapper_dir',
-+       description: 'Directory containing the externally supplied libvfsFprintWrapper library',
-+       type: 'string',
-+       value: '/opt/validity-sensor/usr/lib64')
 diff --git a/meson.build b/meson.build
 --- a/meson.build
 +++ b/meson.build
@@ -36,8 +25,7 @@ diff --git a/libfprint/meson.build b/libfprint/meson.build
      'upekts' :
          [ 'drivers/upekts.c', 'drivers/upek_proto.c' ],
      'upektc' :
-@@ -270,4 +272,7 @@
-+libvfsFprintWrapper_dir = get_option('vfs_proprietary_wrapper_dir')
+@@ -270,4 +272,6 @@
 +subdir('drivers/vfs_proprietary')
 +
  libfprint_drivers = static_library('fprint-drivers',
