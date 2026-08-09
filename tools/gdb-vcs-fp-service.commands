@@ -18,6 +18,19 @@ commands
   continue
 end
 
+# The vendor initializer's documented -nossl option sets startup mode bit
+# 0x100.  Reproduce that mode only when the guarded wrapper explicitly opts in.
+break vcsStartupEx
+commands
+  silent
+  printf "vcsStartupEx mode: 0x%x\n", $esi
+  if $vfs495_no_ssl_compat == 1 && ($esi & 0x100) == 0
+    set $esi = $esi | 0x100
+    printf "  applying guarded vendor no-SSL mode: 0x%x\n", $esi
+  end
+  continue
+end
+
 break serviceVcsSensorGetFingerprintAsync
 commands
   silent

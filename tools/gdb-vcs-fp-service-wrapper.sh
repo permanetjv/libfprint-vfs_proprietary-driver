@@ -9,10 +9,19 @@ case $compat in
         exit 2
         ;;
 esac
+no_ssl_compat=${VFS495_SERVICE_NO_SSL_COMPAT_ENABLED:-0}
+case $no_ssl_compat in
+    0|1) ;;
+    *)
+        echo "invalid VFS495 service no-SSL compatibility mode" >&2
+        exit 2
+        ;;
+esac
 
 exec /opt/bin/gdb \
     --batch \
     -ex "set \$vfs495_raw_hash_compat = $compat" \
+    -ex "set \$vfs495_no_ssl_compat = $no_ssl_compat" \
     -x /opt/bin/gdb-vcs-fp-service.commands \
     --args /opt/vendor/usr/bin/vcsFPService \
     1>&2

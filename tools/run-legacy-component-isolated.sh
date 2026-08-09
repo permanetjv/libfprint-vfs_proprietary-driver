@@ -229,6 +229,19 @@ if [[ -n ${VFS495_SERVICE_GDB_PATH:-} ]]; then
         fi
         bwrap_args+=(--setenv VFS495_SERVICE_RAW_HASH_COMPAT_ENABLED 1)
     fi
+    no_ssl_compat=${VFS495_SERVICE_NO_SSL_COMPAT:-}
+    if [[ -n $no_ssl_compat ]]; then
+        if [[ $raw_hash_compat != I_ACCEPT_VFS495_RAW_HASH_CHECK_BYPASS ]]; then
+            echo "VFS495 no-SSL compatibility also requires RAW-hash compatibility" >&2
+            exit 2
+        fi
+        expected_ack=I_ACCEPT_VFS495_VENDOR_NO_SSL_MODE
+        if [[ $no_ssl_compat != "$expected_ack" ]]; then
+            echo "refusing no-SSL compatibility without the exact acknowledgement token" >&2
+            exit 2
+        fi
+        bwrap_args+=(--setenv VFS495_SERVICE_NO_SSL_COMPAT_ENABLED 1)
+    fi
     if [[ -z ${VFS495_CAPTURE_GDB_PATH:-} ]]; then
         bwrap_args+=(--ro-bind "$VFS495_SERVICE_GDB_PATH" /opt/bin/gdb)
         if [[ -n ${VFS495_SERVICE_GDB_LIB_ROOT:-} ]]; then
