@@ -62,14 +62,18 @@ BIOS update and firmware-level fingerprint reset described below:
 - `sensorstat`: the sensor is secure and no secure session is established;
 - `resetowner -doinit`: reports success;
 - `get_ownership_info`: 65,535 total and 65,535 available ownership cycles,
-  consistent with an unowned sensor;
-- `setowner -doinit`: the vendor API returns `0x172`,
-  `VCS_RESULT_SENSOR_CMD_DENIED`.
+  unchanged across the reset and ownership attempts;
+- an unmodified `setowner -doinit` returns local status `0x172`,
+  `VCS_RESULT_SENSOR_CMD_DENIED`, before submitting SetOwner to the reader;
+- after correcting the VFS495 provisioning-cache regression under a guarded
+  debugger, SetOwner submission and its wait both return success, but the
+  reader's asynchronous callback returns `0x36`, `VCS_RESULT_ERROR`.
 
 Disabling USB autosuspend and running the acquisition path as root do not
 change the result. No fingerprint image has been saved. The current verdict is
 therefore: kernel 7.1 transport works, while raw capture remains blocked by the
-sensor firmware's ownership policy.
+sensor firmware's ownership policy. The callback trace distinguishes that
+policy result from a host USB, wait, or process-isolation failure.
 
 ## BIOS update and fingerprint-reset result
 
@@ -80,26 +84,40 @@ The dedicated **Fingerprint Reset on Reboot** confirmation was also completed;
 the TPM and broader factory-security state were not cleared.
 
 The first isolated `setowner -doinit` after that reset loaded firmware and the
-USB mirror followed the reader from device number 003 to 005. With a fresh,
-regular `ValidityPersistentData` file, the vendor API still returned `0x172`
-(`VCS_RESULT_SENSOR_CMD_DENIED`). Follow-up read-only probes again reported a
-secure sensor with no secure session and 65,535 of 65,535 ownership cycles
-available. The reset therefore left the reader unowned but did not make the
-SetOwner command admissible.
+USB mirror followed the reader across re-enumeration. With a fresh, regular
+`ValidityPersistentData` file, the unmodified vendor API returned `0x172`.
+Follow-up read-only probes again reported a secure sensor with no secure
+session and 65,535 of 65,535 ownership cycles available. These values alone do
+not establish that the reader is unowned.
 
-Additional read-only diagnostics report sensor firmware
-`04.60.00.0104 Falcon ROM` and a zero cached provisioning flag. The vendor
-utility's embedded help identifies exactly this combination as a clean VFS495
-that must be provisioned before SetOwner, and its SetOwner help says ownership
-can be established only after provisioning or an ownership reset. The BIOS
-ownership reset did not supply the missing provisioning state.
+Deeper diagnostics report sensor firmware `04.60.00.0104 Falcon ROM`, raw
+device security state `0x2`, and product ID `0x003f`. Vendor code defines that
+raw state as provisioned and initially derives `isProvisioned=1`, but a later
+post-patch version path incorrectly overwrites the cache with zero. A guarded
+compatibility trace preserves the raw-derived value only for this exact device
+and state. This permits the real SetOwner request, which the firmware rejects
+in its callback with `0x36`.
 
-Raw acquisition therefore remains blocked at the ownership handshake, but the
-next technical step is now identified. `provision vfs495 -doinit` reaches a
-one-time sensor-provisioning operation, writes OTP configuration, and resets
-the reader. It has not been run: unlike the read-only probes and reversible
-host changes, OTP provisioning permanently changes sensor security state and
-requires explicit authorization immediately before execution.
+The separately authorized `provision vfs495 -doinit` diagnostic entered the
+vendor provisioning handler, which reported `Already provisioned.` Neither
+the sensor-provision nor OTP-write function was called, so no OTP change
+occurred. Provisioning is therefore not the next step.
+
+The vendor utility documents that SetOwner is expected to fail when the sensor
+is already secure. Offline control-flow inspection also confirms that a
+successful `resetowner -doinit` result follows the actual synchronous
+reset-ownership operation and storage cleanup; blindly repeating that
+destructive command would not add evidence. The remaining blocker is finding
+a reliable way to clear or re-establish the VFS495 ownership/secure-session
+state after the BIOS reset, or establishing that this firmware revision cannot
+be adopted by the legacy Linux stack. No fingerprint image or biometric data
+has been captured.
+
+All sensor-security-changing launcher modes now require connected AC power,
+the audited initializer hash, an exact acknowledgement token, and a live,
+major/minor-validated USB mirror. The tracked mirror monitor follows transient
+disconnects and device-number changes without the sysfs race found in the
+initial ad-hoc monitor.
 
 References used for the firmware/reset investigation:
 
