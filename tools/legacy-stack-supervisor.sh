@@ -1,7 +1,7 @@
 #!/opt/bin/bash
 set -euo pipefail
 
-service_pid=
+service_launcher_pid=
 ready_timeout=${VFS495_SERVICE_READY_TIMEOUT:-20}
 
 if [[ ! $ready_timeout =~ ^[1-9][0-9]*$ ]] || ((ready_timeout > 120)); then
@@ -10,18 +10,23 @@ if [[ ! $ready_timeout =~ ^[1-9][0-9]*$ ]] || ((ready_timeout > 120)); then
 fi
 
 cleanup() {
-    local attempt
+    local attempt pid targets
 
-    if [[ -n $service_pid ]] && kill -0 "$service_pid" 2>/dev/null; then
-        kill -TERM "$service_pid" 2>/dev/null || true
-        for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            kill -0 "$service_pid" 2>/dev/null || break
-            /opt/bin/sleep 0.1
-        done
-        if kill -0 "$service_pid" 2>/dev/null; then
-            kill -KILL "$service_pid" 2>/dev/null || true
-        fi
-        wait "$service_pid" 2>/dev/null || true
+    targets=$service_launcher_pid
+    targets+=" $(/usr/bin/pidof vcsFPService 2>/dev/null || true)"
+    for pid in $targets; do
+        kill -TERM "$pid" 2>/dev/null || true
+    done
+    for attempt in 1 2 3 4 5 6 7 8 9 10; do
+        targets=$(/usr/bin/pidof vcsFPService 2>/dev/null || true)
+        [[ -z $targets ]] && break
+        /opt/bin/sleep 0.1
+    done
+    for pid in $targets; do
+        kill -KILL "$pid" 2>/dev/null || true
+    done
+    if [[ -n $service_launcher_pid ]]; then
+        wait "$service_launcher_pid" 2>/dev/null || true
     fi
 }
 trap cleanup EXIT HUP INT TERM
@@ -40,15 +45,27 @@ if [[ -n ${VFS495_STRACE_PATH:-} ]]; then
 fi
 
 "${service_cmd[@]}" &
-service_pid=$!
+service_launcher_pid=$!
 
 for ((attempt = 0; attempt < ready_timeout * 10; attempt++)); do
     if [[ -e /tmp/vcsSemKey_ServiceReady ]]; then
         break
     fi
-    if ! kill -0 "$service_pid" 2>/dev/null; then
-        wait "$service_pid"
-        echo "vcsFPService exited before becoming ready" >&2
+    if [[ -n $service_launcher_pid ]] && ! kill -0 "$service_launcher_pid" 2>/dev/null; then
+        if wait "$service_launcher_pid"; then
+            service_launcher_pid=
+        else
+            status=$?
+            echo "vcsFPService launcher exited with status $status" >&2
+            exit "$status"
+        fi
+        if [[ -z $(/usr/bin/pidof vcsFPService 2>/dev/null || true) ]]; then
+            echo "vcsFPService exited without leaving its daemon running" >&2
+            exit 1
+        fi
+    elif [[ -z $service_launcher_pid ]] &&
+         [[ -z $(/usr/bin/pidof vcsFPService 2>/dev/null || true) ]]; then
+        echo "vcsFPService daemon exited before becoming ready" >&2
         exit 1
     fi
     /opt/bin/sleep 0.1
