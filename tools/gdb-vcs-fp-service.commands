@@ -157,6 +157,59 @@ commands
   continue
 end
 
+# The service's ESD recovery path can replace an earlier acquisition error
+# with 0x168 ("The sensor is removed").  Record every callback layer before
+# that translation so a physically present VFS495 is not mistaken for a USB
+# disconnect merely because the recovery path returned its removal sentinel.
+break idsFalconFingerprintCallback
+commands
+  silent
+  printf "  idsFalconFingerprintCallback status: 0x%x (%d), payload_length=%u\n", $esi, $esi, $ecx
+  continue
+end
+
+break idsGetFingerprintCB
+commands
+  silent
+  printf "  idsGetFingerprintCB status: 0x%x (%d), image=%p\n", $esi, $esi, $rdi
+  continue
+end
+
+break _vcsSensorGetFingerprintCB
+commands
+  silent
+  printf "  _vcsSensorGetFingerprintCB status: 0x%x (%d), image=%p\n", $esi, $esi, $rdi
+  continue
+end
+
+break vcsFPServiceFingerprintCallback
+commands
+  silent
+  printf "  vcsFPServiceFingerprintCallback status: 0x%x (%d), image=%p\n", $esi, $esi, $rdi
+  continue
+end
+
+break *vcsFPGetFingerprintIncludeESD+0x224
+commands
+  silent
+  printf "  ESD recovery input status: 0x%x (%d), service_state=%u, event_state=%u\n", *(unsigned int *)($r13 + 0x10), *(unsigned int *)($r13 + 0x10), *(unsigned int *)($rbp + 0x188), *(unsigned int *)($rbx + 0xc)
+  continue
+end
+
+break *vcsFPGetFingerprintIncludeESD+0x400
+commands
+  silent
+  printf "  ESD recovery translated failure to 0x168 (sensor-removed sentinel)\n"
+  continue
+end
+
+break *vcsFPGetFingerprintIncludeESD+0x437
+commands
+  silent
+  printf "  ESD recovery exhausted; hard-resetting sensor and returning 0x168\n"
+  continue
+end
+
 break idsSensorPickImageReconstructor
 commands
   silent
