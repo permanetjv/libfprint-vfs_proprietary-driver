@@ -152,6 +152,31 @@ main(int const argc, char * const argv[])
 	);
 	vfs_initialized = true;
 
+	/*
+	 * The working VFS495 reference keeps the initialized wrapper alive before
+	 * asking it to capture.  Allow the diagnostic stack to reproduce that
+	 * warm-device interval without imposing latency on normal libfprint use.
+	 */
+	{
+		const char * const warmup_text = getenv("VFS495_CAPTURE_WARMUP_MS");
+		if ( warmup_text != NULL && warmup_text[0] != '\0' )
+		{
+			char * end = NULL;
+			errno = 0;
+			unsigned long const warmup_ms = strtoul(warmup_text, &end, 10);
+			ASSERT_PRINTF(
+				errno == 0 && end != warmup_text && *end == '\0' && warmup_ms <= 30000,
+				EXIT_FAILURE, "Invalid VFS495_CAPTURE_WARMUP_MS value");
+
+			struct timespec delay = {
+				.tv_sec = warmup_ms / 1000,
+				.tv_nsec = (warmup_ms % 1000) * 1000000,
+			};
+			while ( nanosleep(&delay, &delay) != 0 && errno == EINTR )
+				;
+		}
+	}
+
 
 	EXECUTE_IN_TIME(VFS_PROPRIETARY_CAPTURE_HELPER_TIMEOUT, "Timed out waiting for capture",
 		/* this will fail if some other instance tries the same while we're waiting for swipe */
@@ -161,8 +186,8 @@ main(int const argc, char * const argv[])
 			if ( iretval == VFSW_CAPTURE_COMPLETE )
 				break;
 
-			fprintf(stderr, "Capture attempt %u/%u failed\n",
-					attempt, VFS_PROPRIETARY_CAPTURE_ATTEMPTS);
+			fprintf(stderr, "Capture attempt %u/%u returned %d\n",
+					attempt, VFS_PROPRIETARY_CAPTURE_ATTEMPTS, iretval);
 			if ( attempt < VFS_PROPRIETARY_CAPTURE_ATTEMPTS )
 			{
 				struct timespec retry_delay = { 0 };
