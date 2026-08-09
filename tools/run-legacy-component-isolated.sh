@@ -357,6 +357,7 @@ if [[ -n ${VFS495_GDB_PATH:-} ]]; then
     setowner_cache_compat=${VFS495_GDB_SETOWNER_CACHE_COMPAT:-}
     setowner_aes_keys=${VFS495_GDB_SETOWNER_AES_KEYS:-}
     setowner_full_keys=${VFS495_GDB_SETOWNER_FULL_KEYS:-}
+    setowner_sim=${VFS495_GDB_SETOWNER_SIM:-}
     selected_gdb_modes=0
     [[ -n $readonly_command ]] && ((selected_gdb_modes += 1))
     [[ $trace_setowner == 1 ]] && ((selected_gdb_modes += 1))
@@ -364,8 +365,9 @@ if [[ -n ${VFS495_GDB_PATH:-} ]]; then
     [[ -n $setowner_cache_compat ]] && ((selected_gdb_modes += 1))
     [[ -n $setowner_aes_keys ]] && ((selected_gdb_modes += 1))
     [[ -n $setowner_full_keys ]] && ((selected_gdb_modes += 1))
+    [[ -n $setowner_sim ]] && ((selected_gdb_modes += 1))
     if ((selected_gdb_modes > 1)); then
-        echo "choose only one read-only, setowner-trace, cache-compat, AES-key ownership, full-key ownership, or provisioning GDB mode" >&2
+        echo "choose only one read-only, setowner-trace, cache-compat, AES-key ownership, full-key ownership, simulated-patch ownership, or provisioning GDB mode" >&2
         exit 2
     fi
     if [[ -n $trace_setowner && $trace_setowner != 1 ]]; then
@@ -412,6 +414,46 @@ if [[ -n ${VFS495_GDB_PATH:-} ]]; then
             exit 2
         fi
         gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-provision-vfs495.commands
+    elif [[ -n $setowner_sim ]]; then
+        require_ac_power
+        expected_ack=I_ACCEPT_VFS495_VOLATILE_TEST_PATCH_OWNERSHIP
+        if [[ $setowner_sim != "$expected_ack" ]]; then
+            echo "refusing simulated-patch ownership without the exact acknowledgement token" >&2
+            exit 2
+        fi
+        if [[ $# -ne 2 || $1 != setowner_sim || $2 != -doinit ]]; then
+            echo "simulated-patch ownership requires exactly: initializer setowner_sim -doinit" >&2
+            exit 2
+        fi
+        : "${VFS495_SETOWNER_EXPECTED_INITIALIZER_SHA256:?set the audited initializer SHA-256}"
+        if [[ ! $VFS495_SETOWNER_EXPECTED_INITIALIZER_SHA256 =~ ^[0-9a-f]{64}$ ]]; then
+            echo "VFS495_SETOWNER_EXPECTED_INITIALIZER_SHA256 must be 64 lowercase hex characters" >&2
+            exit 2
+        fi
+        actual_initializer_sha256=$(sha256sum \
+            "$VFS495_VENDOR_ROOT/usr/sbin/validity-sensor" | awk '{print $1}')
+        if [[ $actual_initializer_sha256 != "$VFS495_SETOWNER_EXPECTED_INITIALIZER_SHA256" ]]; then
+            echo "refusing simulated-patch ownership with an unaudited initializer binary" >&2
+            exit 2
+        fi
+        if [[ $VFS495_USB_SCOPE != mirror ]]; then
+            echo "simulated-patch ownership requires the re-enumeration-safe USB mirror" >&2
+            exit 2
+        fi
+        : "${VFS495_SETOWNER_MIRROR_MONITOR_PID:?set the live USB mirror monitor PID}"
+        if [[ ! $VFS495_SETOWNER_MIRROR_MONITOR_PID =~ ^[1-9][0-9]*$ ]] ||
+           ! kill -0 "$VFS495_SETOWNER_MIRROR_MONITOR_PID" 2>/dev/null; then
+            echo "refusing simulated-patch ownership without a live USB mirror monitor" >&2
+            exit 2
+        fi
+        mirrored_usb_device=$VFS495_USB_MIRROR${VFS495_USB_DEVICE#/dev/bus/usb}
+        if [[ ! -c $mirrored_usb_device ]] ||
+           [[ $(stat -c %t:%T "$mirrored_usb_device") != \
+              $(stat -c %t:%T "$VFS495_USB_DEVICE") ]]; then
+            echo "refusing simulated-patch ownership with a stale USB mirror device" >&2
+            exit 2
+        fi
+        gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-setowner-sim.commands
     elif [[ -n $setowner_full_keys ]]; then
         require_ac_power
         expected_ack=I_ACCEPT_VFS495_FULL_TEST_KEY_OWNERSHIP
