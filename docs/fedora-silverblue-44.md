@@ -87,12 +87,19 @@ secure sensor with no secure session and 65,535 of 65,535 ownership cycles
 available. The reset therefore left the reader unowned but did not make the
 SetOwner command admissible.
 
-Raw acquisition remains blocked at the ownership handshake. Firmware updating,
-BIOS reset, USB transport, re-enumeration, compatibility libraries, and local
-persistent-file layout have now been ruled out as the cause. Any attempt to use
-the vendor's one-time provisioning or locking commands needs separate protocol
-evidence first because those operations can permanently change sensor security
-state.
+Additional read-only diagnostics report sensor firmware
+`04.60.00.0104 Falcon ROM` and a zero cached provisioning flag. The vendor
+utility's embedded help identifies exactly this combination as a clean VFS495
+that must be provisioned before SetOwner, and its SetOwner help says ownership
+can be established only after provisioning or an ownership reset. The BIOS
+ownership reset did not supply the missing provisioning state.
+
+Raw acquisition therefore remains blocked at the ownership handshake, but the
+next technical step is now identified. `provision vfs495 -doinit` reaches a
+one-time sensor-provisioning operation, writes OTP configuration, and resets
+the reader. It has not been run: unlike the read-only probes and reversible
+host changes, OTP provisioning permanently changes sensor security state and
+requires explicit authorization immediately before execution.
 
 References used for the firmware/reset investigation:
 

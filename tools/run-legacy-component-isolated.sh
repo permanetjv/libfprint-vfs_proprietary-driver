@@ -215,6 +215,15 @@ if [[ -n ${VFS495_GDB_PATH:-} ]]; then
       get_ownership_info)
         gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-get-ownership-info.commands
         ;;
+      getver)
+        gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-get-version.commands
+        ;;
+      sslstat)
+        gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-sslstat.commands
+        ;;
+      security_info)
+        gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-security-info.commands
+        ;;
       '')
         gdb_commands=
         ;;
