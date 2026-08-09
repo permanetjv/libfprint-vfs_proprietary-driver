@@ -203,12 +203,14 @@ if [[ -n ${VFS495_GDB_PATH:-} ]]; then
     readonly_command=${VFS495_GDB_READONLY_COMMAND:-}
     trace_setowner=${VFS495_GDB_TRACE_SETOWNER_RESULT:-}
     provision_vfs495=${VFS495_GDB_PROVISION_VFS495:-}
+    setowner_cache_compat=${VFS495_GDB_SETOWNER_CACHE_COMPAT:-}
     selected_gdb_modes=0
     [[ -n $readonly_command ]] && ((selected_gdb_modes += 1))
     [[ $trace_setowner == 1 ]] && ((selected_gdb_modes += 1))
     [[ -n $provision_vfs495 ]] && ((selected_gdb_modes += 1))
+    [[ -n $setowner_cache_compat ]] && ((selected_gdb_modes += 1))
     if ((selected_gdb_modes > 1)); then
-        echo "choose only one read-only, setowner-trace, or provisioning GDB mode" >&2
+        echo "choose only one read-only, setowner-trace, cache-compat, or provisioning GDB mode" >&2
         exit 2
     fi
     if [[ -n $trace_setowner && $trace_setowner != 1 ]]; then
@@ -254,6 +256,45 @@ if [[ -n ${VFS495_GDB_PATH:-} ]]; then
             exit 2
         fi
         gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-provision-vfs495.commands
+    elif [[ -n $setowner_cache_compat ]]; then
+        expected_ack=I_CONFIRMED_RAW_STATE_2_AND_ACCEPT_OWNERSHIP
+        if [[ $setowner_cache_compat != "$expected_ack" ]]; then
+            echo "refusing SetOwner cache compatibility without the exact acknowledgement token" >&2
+            exit 2
+        fi
+        if [[ $# -ne 2 || $1 != setowner || $2 != -doinit ]]; then
+            echo "SetOwner cache compatibility requires exactly: initializer setowner -doinit" >&2
+            exit 2
+        fi
+        : "${VFS495_SETOWNER_EXPECTED_INITIALIZER_SHA256:?set the audited initializer SHA-256}"
+        if [[ ! $VFS495_SETOWNER_EXPECTED_INITIALIZER_SHA256 =~ ^[0-9a-f]{64}$ ]]; then
+            echo "VFS495_SETOWNER_EXPECTED_INITIALIZER_SHA256 must be 64 lowercase hex characters" >&2
+            exit 2
+        fi
+        actual_initializer_sha256=$(sha256sum \
+            "$VFS495_VENDOR_ROOT/usr/sbin/validity-sensor" | awk '{print $1}')
+        if [[ $actual_initializer_sha256 != "$VFS495_SETOWNER_EXPECTED_INITIALIZER_SHA256" ]]; then
+            echo "refusing SetOwner cache compatibility with an unaudited initializer binary" >&2
+            exit 2
+        fi
+        if [[ $VFS495_USB_SCOPE != mirror ]]; then
+            echo "SetOwner cache compatibility requires the re-enumeration-safe USB mirror" >&2
+            exit 2
+        fi
+        : "${VFS495_SETOWNER_MIRROR_MONITOR_PID:?set the live USB mirror monitor PID}"
+        if [[ ! $VFS495_SETOWNER_MIRROR_MONITOR_PID =~ ^[1-9][0-9]*$ ]] ||
+           ! kill -0 "$VFS495_SETOWNER_MIRROR_MONITOR_PID" 2>/dev/null; then
+            echo "refusing SetOwner cache compatibility without a live USB mirror monitor" >&2
+            exit 2
+        fi
+        mirrored_usb_device=$VFS495_USB_MIRROR${VFS495_USB_DEVICE#/dev/bus/usb}
+        if [[ ! -c $mirrored_usb_device ]] ||
+           [[ $(stat -c %t:%T "$mirrored_usb_device") != \
+              $(stat -c %t:%T "$VFS495_USB_DEVICE") ]]; then
+            echo "refusing SetOwner cache compatibility with a stale USB mirror device" >&2
+            exit 2
+        fi
+        gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-setowner-cache-compat.commands
     elif [[ $trace_setowner == 1 ]]; then
         gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-setowner-result.commands
     else
@@ -272,6 +313,9 @@ if [[ -n ${VFS495_GDB_PATH:-} ]]; then
         ;;
       security_info)
         gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-security-info.commands
+        ;;
+      setowner_cache_preflight)
+        gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-setowner-cache-preflight.commands
         ;;
       provision_vfs495_preflight)
         gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-provision-vfs495-preflight.commands
