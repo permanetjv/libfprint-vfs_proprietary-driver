@@ -6,6 +6,19 @@ usage() {
     exit 2
 }
 
+require_ac_power() {
+    local supply
+    for supply in /sys/class/power_supply/*; do
+        [[ -r $supply/type && -r $supply/online ]] || continue
+        [[ $(<"$supply/type") == Mains ]] || continue
+        if [[ $(<"$supply/online") == 1 ]]; then
+            return 0
+        fi
+    done
+    echo "refusing security-state changes without connected AC power" >&2
+    exit 2
+}
+
 [[ $# -ge 1 ]] || usage
 component=$1
 shift
@@ -218,6 +231,7 @@ if [[ -n ${VFS495_GDB_PATH:-} ]]; then
         exit 2
     fi
     if [[ -n $provision_vfs495 ]]; then
+        require_ac_power
         expected_ack=I_UNDERSTAND_THIS_WRITES_SENSOR_OTP
         if [[ $provision_vfs495 != "$expected_ack" ]]; then
             echo "refusing provisioning without the exact OTP acknowledgement token" >&2
@@ -257,6 +271,7 @@ if [[ -n ${VFS495_GDB_PATH:-} ]]; then
         fi
         gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-provision-vfs495.commands
     elif [[ -n $setowner_cache_compat ]]; then
+        require_ac_power
         expected_ack=I_CONFIRMED_RAW_STATE_2_AND_ACCEPT_OWNERSHIP
         if [[ $setowner_cache_compat != "$expected_ack" ]]; then
             echo "refusing SetOwner cache compatibility without the exact acknowledgement token" >&2
