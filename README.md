@@ -137,6 +137,10 @@ runtime. This keeps the open-source build and RPM independent of the
 non-redistributable vendor blob. The dynamic loader searches its normal paths;
 `VFS_PROPRIETARY_WRAPPER_PATH` and `VFS_PROPRIETARY_TOMMATH_PATH` may instead
 name explicit files.
+`VFS_PROPRIETARY_RUNTIME_LIBRARY_PATH` may contain the colon-separated legacy
+library directories needed by the wrapper. The driver maps it to
+`LD_LIBRARY_PATH` only for the capture-helper child, so the fprintd daemon
+itself does not load from the proprietary compatibility tree.
 To customize the path to this dir see [Assumptions and options](#assumptions-and-options) section.
 
 

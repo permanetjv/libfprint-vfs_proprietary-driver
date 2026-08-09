@@ -301,6 +301,7 @@ vfs_proprietary_start (FpiDeviceVfsProprietary *self,
 {
   g_autoptr(GSubprocessLauncher) launcher = NULL;
   GOutputStream *helper_stdin;
+  const gchar *runtime_library_path;
   struct capture_helper_api_input api_input = {
     .img_ready_fd = CHILD_IMG_READY_FD,
     .img_meta_fd = CHILD_IMG_META_FD,
@@ -326,6 +327,10 @@ vfs_proprietary_start (FpiDeviceVfsProprietary *self,
   launcher = g_subprocess_launcher_new (G_SUBPROCESS_FLAGS_STDIN_PIPE |
                                         G_SUBPROCESS_FLAGS_STDOUT_PIPE |
                                         G_SUBPROCESS_FLAGS_STDERR_PIPE);
+  runtime_library_path = g_getenv ("VFS_PROPRIETARY_RUNTIME_LIBRARY_PATH");
+  if (runtime_library_path && *runtime_library_path)
+    g_subprocess_launcher_setenv (launcher, "LD_LIBRARY_PATH",
+                                  runtime_library_path, TRUE);
   g_subprocess_launcher_take_fd (launcher, ready_pipe[1], CHILD_IMG_READY_FD);
   ready_pipe[1] = -1;
   g_subprocess_launcher_take_fd (launcher, meta_pipe[1], CHILD_IMG_META_FD);
