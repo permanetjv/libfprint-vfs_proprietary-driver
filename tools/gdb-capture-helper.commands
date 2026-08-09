@@ -1,0 +1,38 @@
+set pagination off
+set startup-with-shell off
+set debuginfod enabled off
+set confirm off
+
+# The HP wrapper is a direct dependency, so all of its dynamic symbols are
+# available once execution reaches the helper's main function.
+start
+
+break *GroupGetFingerprint+0x85
+commands
+  silent
+  printf "GroupGetSingleFingerprint result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *GroupGetFingerprint+0x11b
+commands
+  silent
+  printf "GroupWaitAllSensorsArmed result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *GroupGetFingerprint+0x145
+commands
+  silent
+  printf "GroupRunServiceUntilTrue result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *FPRINTCaptureFinger+0x66
+commands
+  silent
+  printf "GroupGetFingerprint result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+continue

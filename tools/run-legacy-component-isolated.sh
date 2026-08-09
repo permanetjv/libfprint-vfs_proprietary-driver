@@ -164,7 +164,34 @@ bwrap_args=(
 runtime_library_path=/opt/vendor/usr/lib64:/opt/openssl/usr/lib64:/opt/libusb/usr/lib64
 
 if [[ $component == helper || $component == stack ]]; then
-    bwrap_args+=(--ro-bind "$VFS495_CAPTURE_HELPER" /opt/bin/capture-helper)
+    if [[ -n ${VFS495_CAPTURE_GDB_PATH:-} ]]; then
+        [[ -x $VFS495_CAPTURE_GDB_PATH ]] || {
+            echo "VFS495_CAPTURE_GDB_PATH is not executable" >&2
+            exit 2
+        }
+        capture_gdb_commands=$(dirname "${BASH_SOURCE[0]}")/gdb-capture-helper.commands
+        capture_gdb_wrapper=$(dirname "${BASH_SOURCE[0]}")/gdb-capture-helper-wrapper.sh
+        [[ -f $capture_gdb_commands && -x $capture_gdb_wrapper ]] || {
+            echo "capture-helper GDB support files are missing" >&2
+            exit 2
+        }
+        bwrap_args+=(
+            --ro-bind "$VFS495_CAPTURE_HELPER" /opt/bin/capture-helper-real
+            --ro-bind "$capture_gdb_wrapper" /opt/bin/capture-helper
+            --ro-bind "$VFS495_CAPTURE_GDB_PATH" /opt/bin/gdb
+            --ro-bind "$capture_gdb_commands" /opt/bin/gdb-capture-helper.commands
+        )
+        if [[ -n ${VFS495_CAPTURE_GDB_LIB_ROOT:-} ]]; then
+            [[ -d $VFS495_CAPTURE_GDB_LIB_ROOT ]] || {
+                echo "VFS495_CAPTURE_GDB_LIB_ROOT is not a directory" >&2
+                exit 2
+            }
+            bwrap_args+=(--ro-bind "$VFS495_CAPTURE_GDB_LIB_ROOT" /opt/gdb-libs)
+            runtime_library_path=/opt/gdb-libs:$runtime_library_path
+        fi
+    else
+        bwrap_args+=(--ro-bind "$VFS495_CAPTURE_HELPER" /opt/bin/capture-helper)
+    fi
 fi
 
 if [[ $component == stack ]]; then
