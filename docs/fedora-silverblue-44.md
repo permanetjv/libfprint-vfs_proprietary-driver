@@ -48,6 +48,35 @@ package. Versioned RPMs, rpm-ostree installation and rollback, SELinux policy,
 production systemd/udev integration, and suspend/resume handling remain to be
 implemented after raw acquisition succeeds.
 
+## July 2026 reference comparison
+
+The independently published
+[`0nsec/vfs495-fprintd`](https://github.com/0nsec/vfs495-fprintd) reference uses
+the same VFS495, HP EliteBook 840 G3, SoftPaq-era `vcsFPService`, wrapper, and
+OpenSSL 0.9.8 dependency. It provides useful evidence that this proprietary
+capture stack can still return clean swipe images on a modern Linux userspace.
+It also contributes a sensible persistent-process architecture: keep the
+service and initialized wrapper warm, capture frames on demand, and put a
+separate fprintd-compatible matcher/backend above acquisition.
+
+The reference is not a replacement driver and does not resolve this machine's
+current ownership state. It runs the proprietary service directly as root,
+does not document or package the sensor-specific `/etc/ValidityPersistentData`
+needed for secure-session recovery, and assumes acquisition already works on
+the author's sensor. Its own README marks authentication unusable because NBIS
+cross-matching of velocity-distorted swipe images is unreliable. Its untracked
+`vfs_nbis` executable is also required by the backend but absent from the
+repository.
+
+The parts adapted here are the persistent capture topology, normal-SSL service
+operation, explicit Flex ID `0x83` compatibility, and separation of raw image
+acquisition from matching. The RAW-partition and Flex ID compatibility changes
+are guarded by the exact audited `vcsFPService` hash and explicit
+acknowledgement tokens.
+Porting the reference's open-fprintd/NBIS layer is intentionally deferred until
+this host can capture an image; it cannot fix a sensor command rejected before
+pixels are returned.
+
 ## Kernel 7.1 raw-capture verdict
 
 Kernel USB transport is compatible. The isolated legacy components open the
@@ -75,6 +104,22 @@ therefore: kernel 7.1 transport works, while raw capture remains blocked by the
 sensor firmware's ownership policy. The callback trace distinguishes that
 policy result from a host USB, wait, or process-isolation failure.
 
+The reference-aligned normal-SSL path now gets substantially farther than the
+original port. With the guarded RAW-partition and Flex ID compatibility active,
+the Falcon image reconstructor selects Flex ID `0x83`; `idsStartupIr`, image
+size calculation, all capture-context allocations, and the fingerprint worker
+arm return success. The actual GetFingerprint reply is still `0x172`,
+`VCS_RESULT_SENSOR_CMD_DENIED`; the vendor ESD wrapper then rewrites that to
+`0x168` after its recovery attempt. A separate guarded no-SSL diagnostic
+reaches the same sensor denial, proving that image reconstruction and host SSL
+policy are not the final blocker.
+
+Falcon secure-session tracing also resolves an earlier ambiguous success
+value. The first `scsSSLEstablishSession` return of zero means only that its
+state-machine step was accepted. The SSL context remains in state `7`, while
+`scsSSLIsInSecureSession` requires state `8`. The next step frees the failed
+context and returns `0x17f`; no authenticated session was established.
+
 ## BIOS update and fingerprint-reset result
 
 The EliteBook was updated from HP N75 01.57 to the latest applicable HP N75
@@ -97,6 +142,29 @@ post-patch version path incorrectly overwrites the cache with zero. A guarded
 compatibility trace preserves the raw-derived value only for this exact device
 and state. This permits the real SetOwner request, which the firmware rejects
 in its callback with `0x36`.
+
+The vendor utility's other documented ownership forms have now been exercised
+under equivalent guards. Supplying fresh CIK/CIOS AES keys produces a real
+flags-`0x13` request, and supplying the utility's audited in-binary RSA test
+keypair plus both AES keys produces flags `0x1f`. Both submissions and waits
+succeed on the host, but both asynchronous sensor callbacks return `0x36`.
+The full-key handler persists `HAPrivKey` and `SPrivMod` before it sends the
+request, so the resulting 2,956-byte local state file is not proof of sensor
+ownership. A zero-byte pre-attempt state backup and a 2,956-byte pre-simulation
+backup are retained outside Git.
+
+Offline control-flow inspection found one materially different vendor route,
+`setowner_sim`. Despite its name, it is not a mock: for firmware `04.60` it
+loads a volatile `0x400` module-test patch, calls the real TakeOwnership path,
+attempts SSL initialization and calibration, then restores the normal run
+patch. A hash-pinned, AC-only, USB-mirror-validated launcher mode and detailed
+trace are committed. No simulated-patch ownership call has reached the sensor
+yet: the preceding ESD hard reset left the reader unable to complete even a
+read-only initializer `getver`, and logical USB reset plus driver unbind/rebind
+did not recover it. The laptop's xHCI root hub reports no per-port power
+switching. Testing this last vendor-supported route therefore requires a full
+machine power transition; resetting the complete xHCI controller would disturb
+every USB device and was not done.
 
 The separately authorized `provision vfs495 -doinit` diagnostic entered the
 vendor provisioning handler, which reported `Already provisioned.` Neither
