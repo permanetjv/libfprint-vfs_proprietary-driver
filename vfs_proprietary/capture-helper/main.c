@@ -155,8 +155,23 @@ main(int const argc, char * const argv[])
 
 	EXECUTE_IN_TIME(VFS_PROPRIETARY_CAPTURE_HELPER_TIMEOUT, "Timed out waiting for capture",
 		/* this will fail if some other instance tries the same while we're waiting for swipe */
-		iretval = vfs_capture(&vfsw_data, 1);
-		ASSERT_PRINTF( iretval == VFSW_CAPTURE_COMPLETE , EXIT_FAILURE, "Could not capture fingerprint");
+		for (unsigned int attempt = 1; attempt <= VFS_PROPRIETARY_CAPTURE_ATTEMPTS; attempt++)
+		{
+			iretval = vfs_capture(&vfsw_data, 1);
+			if ( iretval == VFSW_CAPTURE_COMPLETE )
+				break;
+
+			fprintf(stderr, "Capture attempt %u/%u failed\n",
+					attempt, VFS_PROPRIETARY_CAPTURE_ATTEMPTS);
+			if ( attempt < VFS_PROPRIETARY_CAPTURE_ATTEMPTS )
+			{
+				struct timespec retry_delay = { 0 };
+				retry_delay.tv_nsec = 200000000;
+				nanosleep(&retry_delay, NULL);
+			}
+		}
+		ASSERT_PRINTF( iretval == VFSW_CAPTURE_COMPLETE , EXIT_FAILURE,
+				"Could not capture fingerprint after %u attempts", VFS_PROPRIETARY_CAPTURE_ATTEMPTS);
 	);
 
 
