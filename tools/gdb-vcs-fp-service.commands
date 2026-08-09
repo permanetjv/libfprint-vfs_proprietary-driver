@@ -187,4 +187,54 @@ commands
   continue
 end
 
+# Falcon initialization is a table-driven asynchronous state machine.  Trace
+# its selected state/action and the two branches that can leave Flex ID unset.
+# These probes only inspect daemon memory; they do not issue sensor commands.
+break *scsFalconDeviceInit+0x36
+commands
+  silent
+  printf "scsFalconDeviceInit device=%p request=%u mode=%u phase=%u step=%u limit=%u previous=%u flex_id=0x%x\n", $rbx, $r9d, *(unsigned int *)($rbx + 0x730), *(unsigned int *)($r12 + 0x1c), *(unsigned int *)($r12 + 0x48), *(unsigned int *)($r12 + 0x4c), *(unsigned int *)($r12 + 0x58), *(unsigned int *)($rbx + 0x438)
+  set $firmware_version = *(void **)($rbx + 0x1b8)
+  if $firmware_version != 0
+    printf "  firmware version bytes:"
+    x/16ub $firmware_version
+  end
+  continue
+end
+
+break *scsFalconDeviceInit+0xdb
+commands
+  silent
+  printf "  Falcon init dispatch: step=%u action=%u\n", *(unsigned int *)($r12 + 0x48), $eax
+  continue
+end
+
+break *scsFalconDeviceInit+0x220
+commands
+  silent
+  printf "  Falcon Flex-ID action reached: flex_id=0x%x\n", *(unsigned int *)($rbx + 0x438)
+  continue
+end
+
+break *scsFalconDeviceInit+0x252
+commands
+  silent
+  printf "  Falcon Flex-ID determination context=%p\n", *(void **)($r12 + 0x70)
+  continue
+end
+
+break *scsFalconDeviceInit+0xf06
+commands
+  silent
+  printf "  Falcon secure-session action reached: flex_id=0x%x\n", *(unsigned int *)($rbx + 0x438)
+  continue
+end
+
+break *scsFalconDeviceInit+0xf3d
+commands
+  silent
+  printf "  Falcon secure-session state: %u\n", $eax
+  continue
+end
+
 continue
