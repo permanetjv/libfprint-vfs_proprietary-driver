@@ -27,8 +27,8 @@ port commit, runs the port's tests during `%check`, and writes results below
 Before installation, inspect the RPM manifest and dependencies:
 
 ```sh
-rpm -qpl build/fedora-44/RPMS/*/libfprint-1.94.10-5.vfs495.3.fc44.*.rpm
-rpm -qpR build/fedora-44/RPMS/*/libfprint-1.94.10-5.vfs495.3.fc44.*.rpm
+rpm -qpl build/fedora-44/RPMS/*/libfprint-1.94.10-5.vfs495.4.fc44.*.rpm
+rpm -qpR build/fedora-44/RPMS/*/libfprint-1.94.10-5.vfs495.4.fc44.*.rpm
 ```
 
 ## Transactional install and rollback

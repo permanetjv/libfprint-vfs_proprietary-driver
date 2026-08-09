@@ -1,8 +1,8 @@
-%global vfs495_commit 764cf7677acf546d736a9cf48d1b13109a75b9b1
+%global vfs495_commit 3e2cb84d7ee5388c7670cfb02b7d101312b275a2
 
 Name:           libfprint
 Version:        1.94.10
-Release:        5.vfs495.3%{?dist}
+Release:        5.vfs495.4%{?dist}
 Summary:        Toolkit for fingerprint scanners with the VFS495 port
 
 # Most of libfprint and the VFS495 port are LGPL-2.1-or-later.
@@ -126,7 +126,8 @@ test -x "$hwdb_generator"
 %{_datadir}/installed-tests/libfprint-2/
 
 %changelog
-* Sun Aug 09 2026 PermaNet JV <permanetjv@users.noreply.github.com> - 1.94.10-5.vfs495.3
+* Sun Aug 09 2026 PermaNet JV <permanetjv@users.noreply.github.com> - 1.94.10-5.vfs495.4
 - Add the open-source VFS495 port to Fedora 44's libfprint package
 - Keep VFS495 out of libfprint's USB autosuspend allowlist
+- Scope compatibility-library lookup to the capture-helper child
 - Keep the non-redistributable vendor capture runtime outside the RPM
