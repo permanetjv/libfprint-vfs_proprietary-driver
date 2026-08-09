@@ -172,4 +172,19 @@ commands
   continue
 end
 
+break scsFalconProcessFlexIdData
+commands
+  silent
+  printf "scsFalconProcessFlexIdData length=%u bytes:\n", $edx
+  x/32ub $rsi
+  continue
+end
+
+break *scsSensorDetermineFlexId+0x82
+commands
+  silent
+  printf "scsDetermineFlexId result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
 continue
