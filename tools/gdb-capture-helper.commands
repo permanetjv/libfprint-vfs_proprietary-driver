@@ -20,6 +20,37 @@ commands
   continue
 end
 
+break GroupGetFingerprintAsync
+commands
+  silent
+  printf "GroupGetFingerprintAsync event=0x%x (%d) sensor=%p\n", $esi, $esi, $rdx
+  if $rdx != 0
+    printf "  sensor state: removed=%u request_state=%u result=0x%x done=%u\n", *(unsigned int *)($rdx + 0x8c), *(unsigned int *)($rdx + 0x98), *(unsigned int *)($rdx + 0x9c), *(unsigned int *)($rdx + 0x110)
+  end
+  continue
+end
+
+break *GroupGetFingerprintAsync+0x1c0
+commands
+  silent
+  printf "  asynchronous fingerprint callback: event=0x%x (%d) handle=%p\n", $r12d, $r12d, $r13
+  continue
+end
+
+break *GroupSensorEventsHandler+0x2e
+commands
+  silent
+  printf "GroupSensorEventsHandler event_id=%u sensor=%p event=%p\n", $eax, $rbp, $rbx
+  continue
+end
+
+break GroupSensorRemoved
+commands
+  silent
+  printf "GroupSensorRemoved sensor_id=%s group=%p\n", (char *)$rsi, $rdi
+  continue
+end
+
 # The transfer call returns a transport status in eax and places the daemon's
 # operation status in the final four-byte response buffer.
 break *vcsSensorGetFingerprintAsyncPriv+0x8f
