@@ -1,0 +1,50 @@
+set pagination off
+set startup-with-shell off
+set debuginfod enabled off
+set confirm off
+
+# Main accepts only the public `setowner -doinit` command. Immediately before
+# dispatch, require its exact processed shape and replace only the handler with
+# the vendor's hidden setowner_with_keys implementation. Reuse argv[0]'s long,
+# writable process-argument buffer for the two short option strings; no new
+# process memory or untracked key data is introduced by the debugger.
+break *0x4404a2
+commands 1
+  silent
+  if $ebp != 2 || $edi != 2
+    printf "AES-key ownership guard: unexpected processed argc %d/%d; aborting.\n", $ebp, $edi
+    kill
+    quit 4
+  end
+  if *(void **) ($rbx + 8) != SensorSetOwner
+    printf "AES-key ownership guard: original handler mismatch; aborting.\n"
+    kill
+    quit 4
+  end
+  set $vfs495_args = $r15
+  set $vfs495_scratch = *((char **) $vfs495_args)
+  set {char[4]} $vfs495_scratch = "cik"
+  set {char[5]} ($vfs495_scratch + 4) = "cios"
+  set *((char **) $vfs495_args + 1) = $vfs495_scratch
+  set *((char **) $vfs495_args + 2) = $vfs495_scratch + 4
+  set *(void **) ($rbx + 8) = SensorSetOwnerWithKeys
+  set $edi = 3
+  printf "AES-key ownership guard passed; dispatching CIK/CIOS ownership.\n"
+  continue
+end
+
+break SensorSetOwnerWithKeys
+commands 2
+  silent
+  printf "Entered SensorSetOwnerWithKeys with options %s and %s.\n", *((char **) $rsi + 1), *((char **) $rsi + 2)
+  continue
+end
+
+break *SensorSetOwnerWithKeys+0x74a
+commands 3
+  silent
+  printf "vcsSensorSetOwnerWithKeys result: 0x%x (%d): %s\n", $eax, $eax, (char *) SensorResultStatus((int) $eax)
+  continue
+end
+
+run
