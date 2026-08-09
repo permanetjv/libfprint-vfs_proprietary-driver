@@ -206,6 +206,10 @@ end
 break *scsFalconDeviceInit+0x36
 commands
   silent
+  if $vfs495_flex_id_compat == 1 && *(unsigned int *)($rbx + 0x438) == 0
+    printf "  applying guarded VFS495 Flex ID 0x83 compatibility\n"
+    set *(unsigned int *)($rbx + 0x438) = 0x83
+  end
   printf "scsFalconDeviceInit device=%p request=%u mode=%u phase=%u step=%u limit=%u previous=%u flex_id=0x%x\n", $rbx, $r9d, *(unsigned int *)($rbx + 0x730), *(unsigned int *)($r12 + 0x1c), *(unsigned int *)($r12 + 0x48), *(unsigned int *)($r12 + 0x4c), *(unsigned int *)($r12 + 0x58), *(unsigned int *)($rbx + 0x438)
   set $firmware_version = *(void **)($rbx + 0x1b8)
   if $firmware_version != 0

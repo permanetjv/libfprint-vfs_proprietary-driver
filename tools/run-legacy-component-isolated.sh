@@ -242,6 +242,19 @@ if [[ -n ${VFS495_SERVICE_GDB_PATH:-} ]]; then
         fi
         bwrap_args+=(--setenv VFS495_SERVICE_NO_SSL_COMPAT_ENABLED 1)
     fi
+    flex_id_compat=${VFS495_SERVICE_FLEX_ID_COMPAT:-}
+    if [[ -n $flex_id_compat ]]; then
+        if [[ $no_ssl_compat != I_ACCEPT_VFS495_VENDOR_NO_SSL_MODE ]]; then
+            echo "VFS495 Flex-ID compatibility also requires vendor no-SSL mode" >&2
+            exit 2
+        fi
+        expected_ack=I_ACCEPT_VFS495_FLEX_ID_0X83
+        if [[ $flex_id_compat != "$expected_ack" ]]; then
+            echo "refusing Flex-ID compatibility without the exact acknowledgement token" >&2
+            exit 2
+        fi
+        bwrap_args+=(--setenv VFS495_SERVICE_FLEX_ID_COMPAT_ENABLED 1)
+    fi
     if [[ -z ${VFS495_CAPTURE_GDB_PATH:-} ]]; then
         bwrap_args+=(--ro-bind "$VFS495_SERVICE_GDB_PATH" /opt/bin/gdb)
         if [[ -n ${VFS495_SERVICE_GDB_LIB_ROOT:-} ]]; then
