@@ -43,10 +43,15 @@ The following checks pass in a pristine libfprint 1.94.10 integration tree:
 - upstream `fpi-device`, `fpi-ssm`, and `fpi-assembling` unit tests;
 - direct udev and hwdb generation for `138a:003f` without fatal warnings.
 
-This is build evidence, not yet an installable or fully functional Fedora
-package. Versioned RPMs, rpm-ostree installation and rollback, SELinux policy,
-production systemd/udev integration, and suspend/resume handling remain to be
-implemented after raw acquisition succeeds.
+The versioned Fedora 44 RPM and SRPM build reproducibly from Fedora's dist-git
+baseline, run the port checks during `%check`, and have transactional
+rpm-ostree install and override-reset helpers. Deployment remains intentionally
+deferred until raw acquisition, SELinux policy, production systemd isolation,
+and suspend/resume handling are verified.
+
+The Fedora package keeps VFS495 out of libfprint's USB-autosuspend allowlist.
+The driver remains discoverable through the normal udev permissions rule, but
+systemd does not switch this reset-sensitive legacy reader to `power/control=auto`.
 
 ## July 2026 reference comparison
 

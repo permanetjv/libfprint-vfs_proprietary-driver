@@ -46,3 +46,10 @@ diff --git a/libfprint/fprint-list-udev-hwdb.c b/libfprint/fprint-list-udev-hwdb
    { .vid = 0x138a, .pid = 0x0090 },
    { .vid = 0x138a, .pid = 0x0092 },
    { .vid = 0x138a, .pid = 0x0094 },
+@@ -169,5 +165,6 @@ static const FpIdEntry denylist_id_table[] = {
+   { .vid = 0x0483, .pid = 0x2016 },
+   /* https://bugs.freedesktop.org/show_bug.cgi?id=66659 */
+   { .vid = 0x045e, .pid = 0x00bb },
++  { .vid = 0x138a, .pid = 0x003f }, /* VFS495: legacy stack is reset-sensitive */
+   { .vid = 0 },
+ };
