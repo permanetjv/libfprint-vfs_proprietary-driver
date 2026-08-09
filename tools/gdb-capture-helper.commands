@@ -10,15 +10,7 @@ start
 break vcsSensorGetFingerprintAsyncPriv
 commands
   silent
-  printf "vcsSensorGetFingerprintAsyncPriv args: sensor=%p config=%p group=%p label=%p\n", $rdi, $rsi, $rdx, $rcx
-  if $rdi != 0
-    printf "  sensor words:"
-    x/4gx $rdi
-  end
-  if $rsi != 0
-    printf "  config words:"
-    x/4gx $rsi
-  end
+  printf "vcsSensorGetFingerprintAsyncPriv args: sensor_handle=0x%lx callback=%p group=%p label=%p\n", $rdi, $rsi, $rdx, $rcx
   if $rdx != 0
     printf "  group state: sensor=%p async_handle=%p app=%p\n", *(void **)($rdx + 0x90), *(void **)($rdx + 0xa8), *(void **)($rdx + 0x138)
   end
