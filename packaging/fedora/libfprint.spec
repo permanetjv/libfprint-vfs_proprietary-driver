@@ -1,8 +1,8 @@
-%global vfs495_commit 05006f158b62921f5a3af8a26b4e045308394a39
+%global vfs495_commit 6ebac75192333fc248012438cf81aa71b94af252
 
 Name:           libfprint
 Version:        1.94.10
-Release:        5.vfs495.5%{?dist}
+Release:        5.vfs495.6%{?dist}
 Summary:        Toolkit for fingerprint scanners with the VFS495 port
 
 # Most of libfprint and the VFS495 port are LGPL-2.1-or-later.
@@ -75,6 +75,7 @@ Requires:       procps-ng
 Requires:       libtommath
 Requires:       bash
 Requires:       coreutils
+Requires:       findutils
 Requires(post): systemd
 Requires(preun): systemd
 Requires(postun): systemd
@@ -174,9 +175,10 @@ test -x "$hwdb_generator"
 %{_unitdir}/fprintd.service.d/60-vfs495-runtime.conf
 
 %changelog
-* Sun Aug 09 2026 PermaNet JV <permanetjv@users.noreply.github.com> - 1.94.10-5.vfs495.5
+* Sun Aug 09 2026 PermaNet JV <permanetjv@users.noreply.github.com> - 1.94.10-5.vfs495.6
 - Add the open-source VFS495 port to Fedora 44's libfprint package
 - Keep VFS495 out of libfprint's USB autosuspend allowlist
 - Scope compatibility-library lookup to the capture-helper child
 - Add a separate persistent, isolated vendor-runtime integration subpackage
+- Restart the joined fprintd/vendor stack cleanly after suspend
 - Keep the non-redistributable vendor capture runtime outside the RPM

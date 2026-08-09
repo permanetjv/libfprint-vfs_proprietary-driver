@@ -11,14 +11,14 @@ else
 fi
 
 mapfile -t packages < <(find "$rpm_root" -type f \
-    -name 'libfprint-1.94.10-5.vfs495.5.fc44.*.rpm' \
+    -name 'libfprint-1.94.10-5.vfs495.6.fc44.*.rpm' \
     ! -name '*-devel-*' ! -name '*-tests-*' ! -name '*.src.rpm' | sort)
 [[ ${#packages[@]} -eq 1 ]] || {
     echo "expected one Fedora 44 libfprint binary RPM under $rpm_root" >&2
     exit 2
 }
 mapfile -t runtime_packages < <(find "$rpm_root" -type f \
-    -name 'libfprint-vfs495-runtime-1.94.10-5.vfs495.5.fc44.*.rpm' | sort)
+    -name 'libfprint-vfs495-runtime-1.94.10-5.vfs495.6.fc44.*.rpm' | sort)
 [[ ${#runtime_packages[@]} -eq 1 ]] || {
     echo "expected one Fedora 44 VFS495 runtime RPM under $rpm_root" >&2
     exit 2
