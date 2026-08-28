@@ -1,0 +1,10 @@
+set pagination off
+set startup-with-shell off
+break Execute
+commands 1
+  silent
+  set {char[19]} *((char **) $rsi) = "get_ownership_info"
+  set *((char **) $rsi + 1) = *((char **) $rsi)
+  continue
+end
+run

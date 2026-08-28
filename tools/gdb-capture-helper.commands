@@ -1,0 +1,98 @@
+set pagination off
+set startup-with-shell off
+set debuginfod enabled off
+set confirm off
+
+# The HP wrapper is a direct dependency, so all of its dynamic symbols are
+# available once execution reaches the helper's main function.
+start
+
+break vcsSensorGetFingerprintAsyncPriv
+commands
+  silent
+  printf "vcsSensorGetFingerprintAsyncPriv args: sensor_handle=0x%lx callback=%p group=%p label=%p\n", $rdi, $rsi, $rdx, $rcx
+  if $rdx != 0
+    printf "  group state: sensor=%p async_handle=%p app=%p\n", *(void **)($rdx + 0x90), *(void **)($rdx + 0xa8), *(void **)($rdx + 0x138)
+  end
+  if $rcx != 0
+    printf "  label: %s\n", (char *)$rcx
+  end
+  continue
+end
+
+break GroupGetFingerprintAsync
+commands
+  silent
+  printf "GroupGetFingerprintAsync event=0x%x (%d) sensor=%p\n", $esi, $esi, $rdx
+  if $rdx != 0
+    printf "  sensor state: removed=%u request_state=%u result=0x%x done=%u\n", *(unsigned int *)($rdx + 0x8c), *(unsigned int *)($rdx + 0x98), *(unsigned int *)($rdx + 0x9c), *(unsigned int *)($rdx + 0x110)
+  end
+  continue
+end
+
+break *GroupGetFingerprintAsync+0x1c0
+commands
+  silent
+  printf "  asynchronous fingerprint callback: event=0x%x (%d) handle=%p\n", $r12d, $r12d, $r13
+  continue
+end
+
+break *GroupSensorEventsHandler+0x2e
+commands
+  silent
+  printf "GroupSensorEventsHandler event_id=%u sensor=%p event=%p\n", $eax, $rbp, $rbx
+  continue
+end
+
+break GroupSensorRemoved
+commands
+  silent
+  printf "GroupSensorRemoved sensor_id=%s group=%p\n", (char *)$rsi, $rdi
+  continue
+end
+
+# The transfer call returns a transport status in eax and places the daemon's
+# operation status in the final four-byte response buffer.
+break *vcsSensorGetFingerprintAsyncPriv+0x8f
+commands
+  silent
+  printf "vcsFPClientTransferCall result: 0x%x (%d), daemon result: 0x%x (%d)\n", $eax, $eax, *(unsigned int *)($rsp + 0x130), *(unsigned int *)($rsp + 0x130)
+  continue
+end
+
+break *GroupGetFingerprintAsync+0xe7
+commands
+  silent
+  printf "vcsSensorGetFingerprintAsyncA result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *GroupGetFingerprint+0x85
+commands
+  silent
+  printf "GroupGetSingleFingerprint result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *GroupGetFingerprint+0x11b
+commands
+  silent
+  printf "GroupWaitAllSensorsArmed result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *GroupGetFingerprint+0x145
+commands
+  silent
+  printf "GroupRunServiceUntilTrue result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *FPRINTCaptureFinger+0x66
+commands
+  silent
+  printf "GroupGetFingerprint result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+continue

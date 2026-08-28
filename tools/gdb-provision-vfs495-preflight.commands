@@ -1,0 +1,48 @@
+set pagination off
+set startup-with-shell off
+set debuginfod enabled off
+set confirm off
+
+# Exercise the same post-main argv transformation as provisioning, then stop
+# immediately before command dispatch. No command handler is called.
+break Execute
+commands 1
+  silent
+  if $rdi != 3
+    printf "Provisioning preflight: unexpected initial argc %d; aborting.\n", $rdi
+    kill
+    quit 4
+  end
+  set $vfs495_argv = $rsi
+  set *((char **) $vfs495_argv + 3) = *((char **) $vfs495_argv + 2)
+  set {char[7]} *((char **) $vfs495_argv) = "vfs495"
+  set *((char **) $vfs495_argv + 2) = *((char **) $vfs495_argv)
+  set $rdi = 4
+  continue
+end
+
+break *0x4404a2
+commands 2
+  silent
+  set $vfs495_arg = *((char **) $r15 + 2)
+  if $ebp != 3
+    printf "Provisioning preflight: unexpected processed argc %d; aborting.\n", $ebp
+    kill
+    quit 4
+  end
+  if *(char *) ($vfs495_arg + 0) != 'v' || *(char *) ($vfs495_arg + 1) != 'f' || *(char *) ($vfs495_arg + 2) != 's' || *(char *) ($vfs495_arg + 3) != '4' || *(char *) ($vfs495_arg + 4) != '9' || *(char *) ($vfs495_arg + 5) != '5' || *(char *) ($vfs495_arg + 6) != 0
+    printf "Provisioning preflight: model argument mismatch; aborting.\n"
+    kill
+    quit 4
+  end
+  if *(void **) ($rbx + 8) != SensorSetOwner
+    printf "Provisioning preflight: original handler mismatch; aborting.\n"
+    kill
+    quit 4
+  end
+  printf "Provisioning preflight passed: argc=%d, model=%s, original handler=SensorSetOwner; stopping before dispatch.\n", $ebp, $vfs495_arg
+  kill
+  quit 0
+end
+
+run

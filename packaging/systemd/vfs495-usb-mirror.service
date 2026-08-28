@@ -1,0 +1,34 @@
+[Unit]
+Description=Validated VFS495 USB device mirror
+Before=vfs495-vendor.service
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/vfs495/vfs495-usb-mirror /dev/vfs495-usb
+Restart=on-failure
+RestartSec=1s
+
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=false
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+IPAddressDeny=any
+CapabilityBoundingSet=CAP_MKNOD CAP_CHOWN CAP_FOWNER
+AmbientCapabilities=CAP_MKNOD CAP_CHOWN CAP_FOWNER
+NoNewPrivileges=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+PrivateMounts=true
+ProtectProc=invisible
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
