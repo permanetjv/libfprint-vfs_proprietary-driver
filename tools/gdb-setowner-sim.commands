@@ -1,0 +1,56 @@
+set pagination off
+set confirm off
+set debuginfod enabled off
+set startup-with-shell off
+set breakpoint pending on
+
+break SensorSetOwnerSim
+commands
+  silent
+  printf "setowner_sim command handler entered\n"
+  continue
+end
+
+break *SensorSetOwnerSim+0x4a
+commands
+  silent
+  printf "setowner_sim version-query result: 0x%x (%d): %s\n", $eax, $eax, (char *) SensorResultStatus((int) $eax)
+  continue
+end
+
+break vcsTestSimulateTakeOwnership
+commands
+  silent
+  printf "simulated-patch ownership entered: patch=%p patch_bytes=%u key=%p\n", $rsi, $edx, $rcx
+  continue
+end
+
+break *vcsTestSimulateTakeOwnership+0x210
+commands
+  silent
+  printf "loading the vendor's volatile 0x400 module-test patch\n"
+  continue
+end
+
+break *vcsTestSimulateTakeOwnership+0x2ba
+commands
+  silent
+  printf "scsSensorTakeOwnership result: 0x%x (%d): %s\n", $eax, $eax, (char *) SensorResultStatus((int) $eax)
+  continue
+end
+
+break *vcsTestSimulateTakeOwnership+0x34d
+commands
+  silent
+  printf "scsSSLEstablishSessionEx result: 0x%x (%d): %s\n", $eax, $eax, (char *) SensorResultStatus((int) $eax)
+  continue
+end
+
+break *vcsTestSimulateTakeOwnership+0x9c
+commands
+  silent
+  printf "simulated-patch ownership final result: 0x%x (%d): %s\n", $ebx, $ebx, (char *) SensorResultStatus((int) $ebx)
+  continue
+end
+
+run

@@ -1,0 +1,9 @@
+set pagination off
+set startup-with-shell off
+break *0x43a98f
+commands 1
+  silent
+  printf "vcsSensorSetOwner result: 0x%x (%d): %s\n", $eax, $eax, (char *) SensorResultStatus((int) $eax)
+  continue
+end
+run

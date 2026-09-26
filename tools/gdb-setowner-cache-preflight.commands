@@ -1,0 +1,41 @@
+set pagination off
+set startup-with-shell off
+set debuginfod enabled off
+set confirm off
+set $vfs495_raw_provisioned = 0
+
+# Follow both writes to the proprietary library's cached isProvisioned field,
+# then stop after SetOwner reads it and before an ownership command is sent.
+break *0x5177e0
+commands 1
+  silent
+  printf "Raw device-info security state: 0x%x\n", *(unsigned char *) ($rsp + 0x145)
+  printf "Raw device-info product ID: 0x%x\n", *(unsigned short *) ($rsp + 0x140)
+  set $vfs495_raw_provisioned = (*(unsigned char *) ($rsp + 0x145) == 2)
+  continue
+end
+
+break *0x5178b0
+commands 2
+  silent
+  printf "First-time-init derived isProvisioned: %u\n", $edx
+  continue
+end
+
+break *0x50ae5a
+commands 3
+  silent
+  printf "Post-patch-version derived isProvisioned: %u\n", $eax
+  continue
+end
+
+break *0x44b684
+commands 4
+  silent
+  printf "SetOwner cache-check result: status=0x%x, isProvisioned=%u, raw-confirmed=%u\n", $eax, *(unsigned int *) ($rsp + 0x4c), $vfs495_raw_provisioned
+  printf "SetOwner cache preflight stopped before ownership dispatch.\n"
+  kill
+  quit 0
+end
+
+run
