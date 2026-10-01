@@ -1,0 +1,104 @@
+set pagination off
+set startup-with-shell off
+set debuginfod enabled off
+set confirm off
+set $vfs495_raw_provisioned = 0
+set $vfs495_initial_cache_valid = 0
+set $vfs495_setowner_result_ptr = 0
+
+# Preserve the first-time-init provisioning result only for the audited VFS495
+# and only after observing the raw firmware's defined provisioned state (0x2).
+break *0x5177e0
+commands 1
+  silent
+  set $vfs495_raw_state = *(unsigned char *) ($rsp + 0x145)
+  set $vfs495_product_id = *(unsigned short *) ($rsp + 0x140)
+  printf "SetOwner compatibility raw state/product: 0x%x/0x%x\n", $vfs495_raw_state, $vfs495_product_id
+  if $vfs495_raw_state != 2 || $vfs495_product_id != 0x3f
+    printf "SetOwner compatibility guard: unexpected raw device state; aborting.\n"
+    kill
+    quit 4
+  end
+  set $vfs495_raw_provisioned = 1
+  continue
+end
+
+break *0x5178b0
+commands 2
+  silent
+  if $vfs495_raw_provisioned != 1 || $edx != 1
+    printf "SetOwner compatibility guard: initial cache derivation mismatch; aborting.\n"
+    kill
+    quit 4
+  end
+  set $vfs495_initial_cache_valid = 1
+  continue
+end
+
+break *0x50ae5a
+commands 3
+  silent
+  if $vfs495_raw_provisioned != 1 || $vfs495_initial_cache_valid != 1
+    printf "SetOwner compatibility guard: missing raw provisioning evidence; aborting.\n"
+    kill
+    quit 4
+  end
+  printf "Preserving raw isProvisioned=1 over post-patch derived value %u.\n", $eax
+  set $eax = 1
+  continue
+end
+
+break *0x44b684
+commands 4
+  silent
+  printf "SetOwner cache-check result after compatibility: status=0x%x, isProvisioned=%u\n", $eax, *(unsigned int *) ($rsp + 0x4c)
+  if $eax != 0 || *(unsigned int *) ($rsp + 0x4c) != 1
+    printf "SetOwner compatibility guard: cache correction did not hold; aborting.\n"
+    kill
+    quit 4
+  end
+  set $vfs495_setowner_result_ptr = $rsp + 0x30
+  continue
+end
+
+# Record each stage of the real asynchronous SetOwner operation.  The callback
+# filter is critical because the generic callback is shared by unrelated sensor
+# operations during initialization and USB reset/re-enumeration.
+break *0x44b714
+commands 5
+  silent
+  printf "vcsSensorSetOwnerWithKeysAsync submission result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *0x441f70
+commands 6
+  silent
+  if $vfs495_setowner_result_ptr != 0 && $rdx == $vfs495_setowner_result_ptr
+    printf "SetOwner async callback result: 0x%x (%d)\n", $esi, $esi
+  end
+  continue
+end
+
+break *0x44b72c
+commands 7
+  silent
+  printf "SetOwner async wait result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *0x44b737
+commands 8
+  silent
+  printf "SetOwner stored callback result: 0x%x (%d)\n", *(unsigned int *) $vfs495_setowner_result_ptr, *(unsigned int *) $vfs495_setowner_result_ptr
+  continue
+end
+
+break *0x43a98f
+commands 9
+  silent
+  printf "vcsSensorSetOwner result after compatibility: 0x%x (%d): %s\n", $eax, $eax, (char *) SensorResultStatus((int) $eax)
+  continue
+end
+
+run

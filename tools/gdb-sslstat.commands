@@ -1,0 +1,11 @@
+set pagination off
+set startup-with-shell off
+set debuginfod enabled off
+break Execute
+commands 1
+  silent
+  set {char[8]} *((char **) $rsi) = "sslstat"
+  set *((char **) $rsi + 1) = *((char **) $rsi)
+  continue
+end
+run

@@ -1,0 +1,66 @@
+diff --git a/meson.build b/meson.build
+--- a/meson.build
++++ b/meson.build
+@@ -117,4 +117,5 @@
+ default_drivers = [
++    'vfs_proprietary',
+     'upektc_img',
+     'vfs5011',
+     'vfs7552',
+@@ -157,6 +158,7 @@ endif
+ # FIXME: All the drivers should be fixed by adjusting the byte order.
+ # See https://gitlab.freedesktop.org/libfprint/libfprint/-/issues/236
+ endian_independent_drivers = virtual_drivers + [
++    'vfs_proprietary',
+     'aes1610',
+     'aes1660',
+     'aes2550',
+diff --git a/libfprint/meson.build b/libfprint/meson.build
+--- a/libfprint/meson.build
++++ b/libfprint/meson.build
+@@ -89,4 +89,6 @@
+ driver_sources = {
++    'vfs_proprietary' :
++        [ ],
+     'upekts' :
+         [ 'drivers/upekts.c', 'drivers/upek_proto.c' ],
+     'upektc' :
+@@ -270,4 +272,6 @@
++subdir('drivers/vfs_proprietary')
++
+ libfprint_drivers = static_library('fprint-drivers',
+     sources: drivers_sources,
+     c_args: drivers_cflags,
+     dependencies: deps,
+diff --git a/data/autosuspend.hwdb b/data/autosuspend.hwdb
+--- a/data/autosuspend.hwdb
++++ b/data/autosuspend.hwdb
+@@ -425,7 +425,6 @@ usb:v1188p9545*
+ usb:v138Ap003A*
+ usb:v138Ap003C*
+ usb:v138Ap003D*
+-usb:v138Ap003F*
+ usb:v138Ap0090*
+ usb:v138Ap0092*
+ usb:v138Ap0094*
+diff --git a/libfprint/fprint-list-udev-hwdb.c b/libfprint/fprint-list-udev-hwdb.c
+--- a/libfprint/fprint-list-udev-hwdb.c
++++ b/libfprint/fprint-list-udev-hwdb.c
+@@ -87,10 +87,6 @@ static const FpIdEntry allowlist_id_table[] = {
+   { .vid = 0x10a5, .pid = 0xe340 },
+   { .vid = 0x1188, .pid = 0x9545 },
+-  { .vid = 0x138a, .pid = 0x0007 },
+   { .vid = 0x138a, .pid = 0x003a },
+-  { .vid = 0x138a, .pid = 0x003c },
+-  { .vid = 0x138a, .pid = 0x003d },
+-  { .vid = 0x138a, .pid = 0x003f },
+   { .vid = 0x138a, .pid = 0x0090 },
+   { .vid = 0x138a, .pid = 0x0092 },
+   { .vid = 0x138a, .pid = 0x0094 },
+@@ -169,5 +165,6 @@ static const FpIdEntry denylist_id_table[] = {
+   { .vid = 0x0483, .pid = 0x2016 },
+   /* https://bugs.freedesktop.org/show_bug.cgi?id=66659 */
+   { .vid = 0x045e, .pid = 0x00bb },
++  { .vid = 0x138a, .pid = 0x003f }, /* VFS495: legacy stack is reset-sensitive */
+   { .vid = 0 },
+ };

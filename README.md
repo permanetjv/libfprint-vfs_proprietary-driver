@@ -5,6 +5,9 @@
 
 [**See project status announcement**](https://github.com/rindeal/libfprint-vfs_proprietary-driver/issues/8)
 
+The Fedora Silverblue 44 and libfprint 1.94.10 port is documented in
+[docs/fedora-silverblue-44.md](docs/fedora-silverblue-44.md).
+
 ## What
 
 [libfprint](https://www.freedesktop.org/wiki/Software/fprint/libfprint/) driver for:
@@ -129,15 +132,22 @@ From all the files in this archive, we're going to use only two of them: `vcsFPS
 ### `vfs_proprietary_capture-helper`
 
 This small utility is built together with the driver, is installed into `libexec` dir by default and the driver will have it's installation path hardcoded into itself.
-It links dynamically to the proprietary shared library `libvfsFprintWrapper.so`.
-This utility has rpath hardcoded to the directory containing `libvfsFprintWrapper.so`, so you can place the proprietary library even under non-standard directory (eg. `/opt`).
+It loads the proprietary shared library `libvfsFprintWrapper.so` only at
+runtime. This keeps the open-source build and RPM independent of the
+non-redistributable vendor blob. The dynamic loader searches its normal paths;
+`VFS_PROPRIETARY_WRAPPER_PATH` and `VFS_PROPRIETARY_TOMMATH_PATH` may instead
+name explicit files.
+`VFS_PROPRIETARY_RUNTIME_LIBRARY_PATH` may contain the colon-separated legacy
+library directories needed by the wrapper. The driver maps it to
+`LD_LIBRARY_PATH` only for the capture-helper child, so the fprintd daemon
+itself does not load from the proprietary compatibility tree.
 To customize the path to this dir see [Assumptions and options](#assumptions-and-options) section.
 
 
 ## Assumptions and options
 
-The build system assumes the shared binary library is installed in `/opt/validity-sensor/usr/lib64`.
-If that's not the case on your installation you can change the path by defining `libvfsFprintWrapper_dir` Meson variable prior to calling the `subdir(VFS_PROPRIETARY_DIR)` Meson command.
+The proprietary wrapper and its legacy dependencies are runtime inputs and are
+not required to compile the driver.
 
 In order to prevent lockups, the driver will return an error if no fingerprint is scanned within a hardcoded time window.
 This timeout can be set with `VFS_PROPRIETARY_CAPTURE_HELPER_TIMEOUT` preprocessor definition. How you pass it to the preporcessor is at your discretion.

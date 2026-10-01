@@ -1,0 +1,368 @@
+set pagination off
+set startup-with-shell off
+set debuginfod enabled off
+set confirm off
+set follow-fork-mode parent
+set detach-on-fork on
+
+# vcsFPService is stripped, but its service entry points remain in the dynamic
+# symbol table.  Stop at the ELF entry point before installing breakpoints.
+starti
+
+# The service runs shell cleanup through vfork before it daemonizes with fork.
+# Stay with the parent for the former, then follow the actual daemon child.
+catch fork
+commands
+  silent
+  set follow-fork-mode child
+  continue
+end
+
+# The vendor initializer's documented -nossl option sets startup mode bit
+# 0x100.  Reproduce that mode only when the guarded wrapper explicitly opts in.
+break vcsStartupEx
+commands
+  silent
+  printf "vcsStartupEx mode: 0x%x\n", $esi
+  if $vfs495_no_ssl_compat == 1 && ($esi & 0x100) == 0
+    set $esi = $esi | 0x100
+    printf "  applying guarded vendor no-SSL mode: 0x%x\n", $esi
+  end
+  continue
+end
+
+break serviceVcsSensorGetFingerprintAsync
+commands
+  silent
+  printf "serviceVcsSensorGetFingerprintAsync request\n"
+  continue
+end
+
+break *serviceVcsSensorGetFingerprintAsync+0x63
+commands
+  silent
+  printf "  vcsFPAddToCallbackList result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *serviceVcsSensorGetFingerprintAsync+0xfe
+commands
+  silent
+  printf "  sensor lookup result: %p\n", $rax
+  continue
+end
+
+break *serviceVcsSensorGetFingerprintAsync+0x119
+commands
+  silent
+  printf "  sensor state query result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *serviceVcsSensorGetFingerprintAsync+0x13a
+commands
+  silent
+  printf "  vcsSensorUpdateGetPrintContext result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *serviceVcsSensorGetFingerprintAsync+0x217
+commands
+  silent
+  printf "  prepare-get-print method result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *serviceVcsSensorGetFingerprintAsync+0x232
+commands
+  silent
+  printf "  vcsFPServiceStartGetPrintThread result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break _vcsSensorPrepareGetFingerprintContext
+commands
+  silent
+  printf "  preparing fingerprint context with path: %s\n", (char *)$rsi
+  continue
+end
+
+break *_vcsSensorPrepareGetFingerprintContext+0x4e
+commands
+  silent
+  printf "    vcsSensorValidate result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *_vcsSensorPrepareGetFingerprintContext+0x6a
+commands
+  silent
+  printf "    reconstructed-image size result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *_vcsSensorPrepareGetFingerprintContext+0xb0
+commands
+  silent
+  printf "    image allocation result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *_vcsSensorPrepareGetFingerprintContext+0xdc
+commands
+  silent
+  printf "    capture-metrics result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *_vcsSensorPrepareGetFingerprintContext+0xfc
+commands
+  silent
+  printf "    capture-mode result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *_vcsSensorPrepareGetFingerprintContext+0x112
+commands
+  silent
+  printf "    sensor-context allocation result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *_vcsSensorPrepareGetFingerprintContext+0x128
+commands
+  silent
+  printf "    sensor-handle context result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *_vcsSensorPrepareGetFingerprintContext+0x13f
+commands
+  silent
+  printf "    file-path context result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *_vcsSensorPrepareGetFingerprintContext+0x15b
+commands
+  silent
+  printf "    capture-parameter context result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *vcsFPGetFingerprintIncludeESD+0xe8
+commands
+  silent
+  printf "  worker vcsSensorGetFingerprintAsyncA result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+# The service's ESD recovery path can replace an earlier acquisition error
+# with 0x168 ("The sensor is removed").  Record every callback layer before
+# that translation so a physically present VFS495 is not mistaken for a USB
+# disconnect merely because the recovery path returned its removal sentinel.
+break idsFalconFingerprintCallback
+commands
+  silent
+  printf "  idsFalconFingerprintCallback status: 0x%x (%d), payload_length=%u\n", $esi, $esi, $ecx
+  continue
+end
+
+break idsGetFingerprintCB
+commands
+  silent
+  printf "  idsGetFingerprintCB status: 0x%x (%d), image=%p\n", $esi, $esi, $rdi
+  continue
+end
+
+break _vcsSensorGetFingerprintCB
+commands
+  silent
+  printf "  _vcsSensorGetFingerprintCB status: 0x%x (%d), image=%p\n", $esi, $esi, $rdi
+  continue
+end
+
+break vcsFPServiceFingerprintCallback
+commands
+  silent
+  printf "  vcsFPServiceFingerprintCallback status: 0x%x (%d), image=%p\n", $esi, $esi, $rdi
+  continue
+end
+
+break *vcsFPGetFingerprintIncludeESD+0x224
+commands
+  silent
+  printf "  ESD recovery input status: 0x%x (%d), service_state=%u, event_state=%u\n", *(unsigned int *)($r13 + 0x10), *(unsigned int *)($r13 + 0x10), *(unsigned int *)($rbp + 0x188), *(unsigned int *)($rbx + 0xc)
+  continue
+end
+
+break *vcsFPGetFingerprintIncludeESD+0x400
+commands
+  silent
+  printf "  ESD recovery translated failure to 0x168 (sensor-removed sentinel)\n"
+  continue
+end
+
+break *vcsFPGetFingerprintIncludeESD+0x437
+commands
+  silent
+  printf "  ESD recovery exhausted; hard-resetting sensor and returning 0x168\n"
+  continue
+end
+
+break idsSensorPickImageReconstructor
+commands
+  silent
+  printf "idsSensorPickImageReconstructor sensor=%p\n", $rdi
+  continue
+end
+
+break *idsSensorPickImageReconstructor+0x50
+commands
+  silent
+  printf "  scsSensorGetFlexId result: 0x%x (%d), flex_id=0x%x\n", $eax, $eax, *(unsigned int *)($rsp + 0x1c)
+  continue
+end
+
+break *idsSensorPickImageReconstructor+0x7c
+commands
+  silent
+  printf "  scsSensorGetDriverVersion result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *idsSensorPickImageReconstructor+0xc2
+commands
+  silent
+  printf "  idsStartupIr result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break scsFalconProcessFlexIdData
+commands
+  silent
+  printf "scsFalconProcessFlexIdData length=%u bytes:\n", $edx
+  x/32ub $rsi
+  continue
+end
+
+break *scsSensorDetermineFlexId+0x82
+commands
+  silent
+  printf "scsDetermineFlexId result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+# Falcon initialization is a table-driven asynchronous state machine.  Trace
+# its selected state/action and the two branches that can leave Flex ID unset.
+# These probes only inspect daemon memory; they do not issue sensor commands.
+break *scsFalconDeviceInit+0x36
+commands
+  silent
+  if $vfs495_flex_id_compat == 1 && *(unsigned int *)($rbx + 0x438) == 0
+    printf "  applying guarded VFS495 Flex ID 0x83 compatibility\n"
+    set *(unsigned int *)($rbx + 0x438) = 0x83
+  end
+  printf "scsFalconDeviceInit device=%p request=%u mode=%u phase=%u step=%u limit=%u previous=%u flex_id=0x%x\n", $rbx, $r9d, *(unsigned int *)($rbx + 0x730), *(unsigned int *)($r12 + 0x1c), *(unsigned int *)($r12 + 0x48), *(unsigned int *)($r12 + 0x4c), *(unsigned int *)($r12 + 0x58), *(unsigned int *)($rbx + 0x438)
+  set $firmware_version = *(void **)($rbx + 0x1b8)
+  if $firmware_version != 0
+    printf "  firmware version bytes:"
+    x/16ub $firmware_version
+  end
+  continue
+end
+
+break *scsFalconDeviceInit+0xdb
+commands
+  silent
+  printf "  Falcon init dispatch: step=%u action=%u\n", *(unsigned int *)($r12 + 0x48), $eax
+  continue
+end
+
+break *scsFalconDeviceInit+0x220
+commands
+  silent
+  printf "  Falcon Flex-ID action reached: flex_id=0x%x\n", *(unsigned int *)($rbx + 0x438)
+  continue
+end
+
+break VerifyRAWPartitionIntegrity
+commands
+  silent
+  printf "  Falcon RAW-partition integrity check started: sensor=%p\n", $rdi
+  continue
+end
+
+break *VerifyRAWPartitionIntegrity+0x4a
+commands
+  silent
+  printf "    CalculateRAWPartitionHash result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *VerifyRAWPartitionIntegrity+0x95
+commands
+  silent
+  printf "    xvfsGetRawPartitionEntry result: 0x%x (%d)\n", $eax, $eax
+  continue
+end
+
+break *scsFalconDeviceInit+0x782
+commands
+  silent
+  printf "  Falcon RAW-partition integrity result: 0x%x (%d), mismatch=%u\n", $eax, $eax, *(unsigned int *)($rsp + 0x368)
+  if $vfs495_raw_hash_compat == 1 && $eax == 0x176
+    printf "  applying guarded VFS495 missing-RAW-hash compatibility\n"
+    set $eax = 0
+  end
+  continue
+end
+
+break *scsFalconDeviceInit+0x626
+commands
+  silent
+  printf "  Falcon stored RAW-hash lookup result: 0x%x (%d), storage_mode=%u init_flag=%u\n", $eax, $eax, *(unsigned int *)($rbx + 0x49c), *(unsigned int *)($r12 + 0x64)
+  if $vfs495_raw_hash_compat == 1 && $eax == 0x4f
+    printf "  applying guarded VFS495 missing stored-RAW-hash compatibility\n"
+    set $eax = 0
+  end
+  continue
+end
+
+break *scsFalconDeviceInit+0x252
+commands
+  silent
+  printf "  Falcon Flex-ID determination context=%p\n", *(void **)($r12 + 0x70)
+  continue
+end
+
+break *scsFalconDeviceInit+0xf06
+commands
+  silent
+  printf "  Falcon secure-session action reached: callback_result=0x%x (%d) flex_id=0x%x\n", $r9d, $r9d, *(unsigned int *)($rbx + 0x438)
+  set $ssl_context = *(void **)($rbx + 0x1d8)
+  if $ssl_context != 0
+    printf "    SSL state before step=%u stored_result=0x%x (%d)\n", *(unsigned char *)($ssl_context + 0x4e4), *(unsigned int *)($ssl_context + 0x4e8), *(unsigned int *)($ssl_context + 0x4e8)
+  end
+  continue
+end
+
+break *scsFalconDeviceInit+0xf13
+commands
+  silent
+  printf "  Falcon secure-session establish result: 0x%x (%d)\n", $eax, $eax
+  set $ssl_context = *(void **)($rbx + 0x1d8)
+  if $ssl_context != 0
+    printf "    SSL state=%u stored_result=0x%x (%d)\n", *(unsigned char *)($ssl_context + 0x4e4), *(unsigned int *)($ssl_context + 0x4e8), *(unsigned int *)($ssl_context + 0x4e8)
+  end
+  continue
+end
+
+break *scsFalconDeviceInit+0xf3d
+commands
+  silent
+  printf "  Falcon secure-session established: %u\n", $eax
+  continue
+end
+
+continue

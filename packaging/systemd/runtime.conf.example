@@ -1,0 +1,7 @@
+# Install as /etc/vfs495/runtime.conf only after staging the external runtime.
+VFS495_VENDOR_ROOT=/var/lib/vfs495-runtime/vendor
+VFS495_OPENSSL_ROOT=/var/lib/vfs495-runtime/openssl
+VFS495_LIBUSB_ROOT=/var/lib/vfs495-runtime/libusb
+VFS495_USB_MIRROR=/dev/vfs495-usb
+VFS495_SERVICE_SHA256=03aec6bf1fdd8bc369b7eb96f04f1f58e2b392be753a4d5e9b457add2b1a57f9
+VFS495_WRAPPER_SHA256=159da565b618ab1b166dfd456249f9ffe80ffc9e3984702543d1ab5a1362dc74

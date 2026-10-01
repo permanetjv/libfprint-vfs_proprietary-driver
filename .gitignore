@@ -60,3 +60,7 @@ dkms.conf
 
 
 # End of https://www.gitignore.io/api/c,kdevelop4
+
+__pycache__/
+*.py[cod]
+build/

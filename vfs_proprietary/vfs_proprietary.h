@@ -34,8 +34,8 @@
 /* Minimum image height */
 // #define VFS_PROPRIETARY_IMG_MIN_HEIGHT  200  // less than 200 returned when run-testing
 
-/* Maximum image height */
-#define VFS_PROPRIETARY_IMG_MAX_HEIGHT  1023  // not used originally
+/* Maximum width or height accepted from the untrusted capture helper. */
+#define VFS_PROPRIETARY_IMG_MAX_DIMENSION  1023
 
 /* Number of enroll stages */
 #define VFS_PROPRIETARY_NR_ENROLL       1

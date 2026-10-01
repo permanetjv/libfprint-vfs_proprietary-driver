@@ -19,9 +19,15 @@
 #ifndef VFS_PROPRIETARY_CAPTURE_HELPER_H_
 #define VFS_PROPRIETARY_CAPTURE_HELPER_H_
 
+#include <stdint.h>
+
 
 #ifndef VFS_PROPRIETARY_CAPTURE_HELPER_TIMEOUT
 #  define VFS_PROPRIETARY_CAPTURE_HELPER_TIMEOUT  30
+#endif
+
+#ifndef VFS_PROPRIETARY_CAPTURE_ATTEMPTS
+#  define VFS_PROPRIETARY_CAPTURE_ATTEMPTS  5
 #endif
 
 
@@ -33,14 +39,11 @@ struct __attribute__ ((__packed__)) capture_helper_api_input
 };
 
 
-enum capture_helper_img_ready_status
-{
-	CAPTURE_HELPER_IMG_READY_OK = 0xAAAAAAAAAAAAAAAALL, // alternating bits starting with 0
-};
+#define CAPTURE_HELPER_IMG_READY_OK UINT64_C(0xAAAAAAAAAAAAAAAA)
 
 struct __attribute__ ((__packed__)) capture_helper_api_img_ready
 {
-	enum capture_helper_img_ready_status status;
+	uint64_t status;
 };
 
 

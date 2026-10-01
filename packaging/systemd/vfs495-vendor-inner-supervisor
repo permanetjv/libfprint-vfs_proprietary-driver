@@ -1,0 +1,32 @@
+#!/bin/bash
+set -euo pipefail
+
+service_pid=
+
+# shellcheck disable=SC2329 # invoked by trap
+cleanup() {
+    local pid targets
+    targets=$service_pid
+    targets+=" $(/usr/bin/pidof vcsFPService 2>/dev/null || true)"
+    for pid in $targets; do
+        kill -TERM "$pid" 2>/dev/null || true
+    done
+    /usr/bin/sleep 0.2
+    for pid in $(/usr/bin/pidof vcsFPService 2>/dev/null || true); do
+        kill -KILL "$pid" 2>/dev/null || true
+    done
+    /usr/bin/rm -f /tmp/vcsSemKey_* /tmp/CH_*
+}
+trap cleanup EXIT HUP INT TERM
+
+/opt/vendor/usr/bin/vcsFPService &
+service_pid=$!
+
+while :; do
+    if ! kill -0 "$service_pid" 2>/dev/null &&
+       [[ -z $(/usr/bin/pidof vcsFPService 2>/dev/null || true) ]]; then
+        wait "$service_pid"
+        exit $?
+    fi
+    /usr/bin/sleep 0.2
+done

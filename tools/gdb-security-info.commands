@@ -1,0 +1,22 @@
+set pagination off
+set startup-with-shell off
+set debuginfod enabled off
+set $vfs495_security_printed = 0
+break Execute
+commands 1
+  silent
+  set {char[11]} *((char **) $rsi) = "sensorstat"
+  set *((char **) $rsi + 1) = *((char **) $rsi)
+  continue
+end
+break *0x4e750e
+commands 2
+  silent
+  set $vfs495_device = *(void **) ($rsp + 8)
+  if $vfs495_security_printed == 0
+    printf "Cached provisioning flag: %u\n", *(unsigned int *) ($vfs495_device + 0x4a4)
+    set $vfs495_security_printed = 1
+  end
+  continue
+end
+run
